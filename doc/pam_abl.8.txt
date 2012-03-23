@@ -1,0 +1,167 @@
+PAM_ABL(8)
+=========
+:man source: GNU
+:man manual: Linux-PAM Manual
+:author: Chris Tasma
+
+NAME
+----
+
+pam_abl - PAM Auto Blacklist Module
+
+SYNOPSIS
+--------
+
+Provides auto blacklisting of hosts and users responsible for repeated
+failed authentication attempts. Generally configured so that blacklisted
+users still see normal login prompts but are guaranteed to fail to
+authenticate.
+
+This functionality is only available to services which call PAM as root.
+If pam_abl is called for uid != 0 it will silently succeed.
+
+DESCRIPTION
+-----------
+
+Brute force password discovery attacks involve repeated attempts to
+authenticate against a service using a dictionary of common passwords. While it
+is desirable to enforce strong passwords for users this is not always possible
+and in cases where a weak password has been used brute force attacks can be
+effective.
+
+The pam_abl module monitors failed authentication attempts and automatically
+blacklists those hosts (and accounts) that are responsible for large numbers of
+failed attempts. Once a host is blacklisted it is guaranteed to fail
+authentication even if the correct credentials are provided.
+
+Blacklisting is triggered when the number of failed authentication attempts in
+a particular period of time exceeds a predefined limit. Hosts which stop
+attempting to authenticate will, after a period of time, be un-blacklisted.
+
+Commands can be specified which will be run when a host or user switches state
+from being blocked to clear or clear to blocked.  See below or the
+pam_abl.conf(5) manpage for the details.
+
+If pam_abl is called for uid != 0 it will silently succeed.  If this was not the
+case it would be possible for a malicious local user to poison the pam_abl data
+by, for example, discovering the names of the hosts from which root typically
+logs in and then constructing PAM authentication code to lock out root login
+attempts from those hosts.
+
+OPTIONS
+-------
+
+[frame="none",cols="s,25d,50d",options="header"]
+|=========================================================================
+|'Name'|'Arguments'|'Description'           
+|debug|None|Enable debug output to syslog. 
+|expose_account|None|Ignored 
+
+|no_warn|None|
+Disable warnings which are otherwise output to syslog.  try_first_pass None
+Ignored 
+
+|use_first_pass|None|Ignored 
+|use_mapped_pass|None|Ignored 
+
+|config|Path to the configuration file.|
+The configuration file contains additional arguments. In order for the pam_abl command line tool to work correctly most of the configuration should be placed in the config file rather than being provided by arguments. The format of the config file is described below.
+
+|host_db|Path to host database file.|
+Path to the Berkeley DB which is used to log the host responsible for failed
+authentication attempts.
+
+|host_purge|Purge time for the host database.|
+Defines how long failed hosts are retained in the host database. Defaults to 1
+day.
+
+|host_rule|Rule for host blacklisting.|
+The rule (see below for format) which defines the conditions under which a
+failed hosts will be blackisted.
+
+|host_blk_cmd|Host block command |
+Command that should be run when a host is checked, and is currently blocked.
+Within the command, the strings %u, %h and %s are substituted with username,
+host and service.  Not all need to be used.  If substitution is called
+for, but there is no iformation for that field, the command will not
+run.
+
+|host_clr_cmd|Host block command |
+Command that should be run when a host is checked, and is currently clear.
+Within the command, the strings %u, %h and %s are substituted with username,
+host and service.  Not all need to be used.  If substitution is called
+for, but there is no iformation for that field, the command will not
+run.
+
+|user_db|Path to user database file.|
+Path to the Berkeley DB which is used to log the user responsible for failed
+authentication attempts.
+
+|user_purge|Purge time for the user database.|
+Defines how long failed users are retained in the user database. Defaults to 1
+day.
+
+|user_rule|Rule for user blacklisting.|
+The rule (see below for format) which defines the conditions under which a
+failed users will be blackisted.
+
+|user_blk_cmd|Host block command |
+Command that should be run when a user is checked, and is currently blocked.
+Within the command, the strings %u, %h and %s are substituted with username,
+host and service.  Not all need to be used.  If substitution is called
+for, but there is no iformation for that field, the command will not
+run.
+
+|user_clr_cmd|Host block command |
+Command that should be run when a user is checked, and is currently clear.
+Within the command, the strings %u, %h and %s are substituted with username,
+host and service.  Not all need to be used.  If substitution is called
+for, but there is no iformation for that field, the command will not
+run.
+
+|=========================================================================
+
+USAGE
+-----
+
+Typically pam_abl.so is added to the auth stack as a required
+module just before whatever modules actually peform
+authentication. Here's a fragment of the PAM config for a
+production server that is running pam_abl:
+
+auth required   /lib/security/pam_env.so                           
+auth required   /lib/security/pam_abl.so                           
+                config=/etc/security/pam_abl.conf                  
+auth sufficient /lib/security/pam_unix.so likeauth nullok          
+auth required   /lib/security/pam_deny.so                          
+
+Although all of accepted arguments can be supplied here they will
+usually be placed in a separate config file and linked to using
+the config argument as in the above example. The pam_abl command
+line tool reads the external config file
+(/etc/security/pam_abl.conf in this case) to find the databases so
+in order for it work correctly an external config should be used.
+
+
+EXAMPLES
+--------
+
+-------------------------------------
+auth required /lib/security/pam_env.so 
+auth required /lib/security/pam_abl.so config=/etc/security/pam_abl.conf 
+auth sufficient /lib/security/pam_unix.so likeauth nullok 
+auth required /lib/security/pam_deny.so 
+-------------------------------------
+
+
+SEE ALSO
+--------
+
+pam_abl.conf(5), pam_abl(1)
+
+AUTHORS
+-------
+
+Andy Armstrong <andy@hexten.net>
+
+Chris Tasma <pam-abl@deksai.com>

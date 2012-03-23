@@ -1,0 +1,116 @@
+PAM_ABL(1)
+=========
+:man source: GNU
+:man manual: User Commands
+:author: Chris Tasma
+
+NAME
+----
+
+pam_abl - query or purge the databases used by the pam_abl module.
+
+SYNOPSIS
+--------
+
+pam_abl [OPTION] [CONFIG]
+
+DESCRIPTION
+-----------
+
+Provides a non-pam interface to the infomration stored in the pam_abl module
+databases.  CONFIG is the name of the pam_abl config file (default:
+/etc/security/pam_abl.conf). The config file is read to discover the names of
+the pam_abl databases, the rules that control purging of old data from them and
+commands to run when a user or host switches state.
+
+OPTIONS
+-------
+MAINTENANCE
+~~~~~~~~~~~
+
+*-h, --help*::
+       See this message.
+
+*-p, --purge*::
+       Purge databases according to purge rules in config.
+
+*-r, --relative*::
+       Display times relative to now.
+
+*-v, --verbose*::
+       Verbose output.
+
+NON-PAM INTERACTION
+~~~~~~~~~~~~~~~~~~~
+*-f, --fail*::
+       Fail user or host.
+*-w, --whitelist*::
+        Perform whitelisting (remove from blacklist, does not provide immunity).
+*-c, --check*::
+        Check status.  Returns non-zero if currently blocked
+        Prints 'name: status' if verboseness is specified.
+        If more than one host or user is given, checks only the first host/user
+        pair.
+*-s, --service*::
+        Operate in context of specified service.  Defaults to 'none'.
+*-U, --user*::
+        Operate on user (wildcards are ok for whitelisting).
+*-H, --host*::
+        Operate on host (wildcards are ok for whitelisting).
+
+If you specified commands to run in your configuration, those commands will try
+to run if the host or user switches state (blocked <-> clear) since the last
+time it was checked.  The command will only be able to run, however, if you
+supply enough information to fill in the substitutions in the command.  For
+instance, if your host_clr_command uses the %s parameter, you will need to
+specify the service with -s in order for the command to actually run.
+
+EXAMPLES
+--------
+
+Obtain a list of failed hosts and users:
+*********
+$ pam_abl
+*********
+
+Obtain a full list of failures listing times relative to now:
+********************************************
+$ pam_abl -rv $ pam_abl --relative --verbose
+********************************************
+
+Purge old data:
+******************************
+$ pam_abl -p $ pam_abl --purge
+******************************
+
+Unblock all example.com, somewhere.com hosts:
+***********************************************************************
+$ pam_abl -w -H \*.example.com -H \*.somewhere.com
+***********************************************************************
+
+Fail the host badguy.com and the user joe:
+***********************************************************************
+$ pam_abl -f -H badguy.com -U joe
+***********************************************************************
+
+Check whether joe is currently allowed to use your neato service from somehost,
+running the necessary commands if he switches state:
+***********************************************************************
+$ pam_abl -c -U joe -H somehost -s neato
+***********************************************************************
+
+AUTHORS
+-------
+
+Andy Armstrong <andy@hexten.net>
+
+Chris Tasma <pam-abl@deksai.com>
+
+
+REPORTING BUGS
+--------------
+Report bugs to <pam-abl@deksai.com>
+
+SEE ALSO
+--------
+pam_abl.conf(5), pam_abl(8)
