@@ -91,7 +91,7 @@ int setState(AuthState *state, BlockState blockState) {
 
 unsigned int getNofAttempts(AuthState *state) {
     if (!state || !state->m_data)
-        return -1;
+        return 0;
     unsigned int nofAttempts = *(unsigned int *)(((int*)(state->m_data))+1);
     return nofAttempts;
 }

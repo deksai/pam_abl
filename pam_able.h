@@ -18,9 +18,29 @@ typedef struct {
     const char *service;
 } abl_info;
 
+/*
+  Given a full configuration open the required environment and databases
+  \param args The config with all the db params
+  \param logContext The loggin context to use when reporting errors/warnings/...
+  \return a valid environment on success, otherwise a nullptr
+  \note f something goes wrong, error messages are written to the logContext
+*/
 PamAbleDbEnv *openPamAbleDbEnvironment(abl_args *args, log_context *logContext);
+
+/*
+  Close a full environment. Make sure no transaction is open
+  \note Do not use the env pointer anymore after calling this function
+*/
 void destroyPamAbleDbEnvironment(PamAbleDbEnv *env);
 
+/*
+  Call the desired scripts if possible
+  \param bState Determines what script gets called (BLOCKED or CLEAR)
+  \param args Holds the strings with the scripts
+  \param info The current host/user/service
+  \param logContext The context that will be used when reporting errors/warnings/...
+  \return zero on success, otherwise non zero
+*/
 int runHostCommand(BlockState bState, const abl_args *args, abl_info *info, log_context *logContext);
 int runUserCommand(BlockState bState, const abl_args *args, abl_info *info, log_context *logContext);
 

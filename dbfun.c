@@ -35,6 +35,7 @@ int createEnvironment(log_context *context, const char *home, DbEnvironment **en
         memset(retValue, 0, sizeof(DbEnvironment));
         retValue->m_envHandle = dbenv;
         retValue->m_logContext = context;
+        retValue->m_transaction = NULL;
         *env = retValue;
     }
     return ret;

@@ -303,6 +303,7 @@ static int dopurge(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logCo
     DB *db = NULL;
     DBT key, data;
     DBC *cursor;
+    DB_TXN *tid = NULL;
     int err;
     time_t now = time(NULL);
     time_t purgeTime = now;
@@ -334,7 +335,7 @@ static int dopurge(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logCo
         log_db_error(logContext, err, "starting transaction");
         goto dopurge_fail;
     }
-    DB_TXN *tid = dbEnv->m_environment->m_transaction;
+    tid = dbEnv->m_environment->m_transaction;
     if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
         log_db_error(logContext, err, "creating cursor");
         goto dopurge_fail;
@@ -428,6 +429,7 @@ static int doupdate(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logC
     DB *db = NULL;
     DBT key, data;
     DBC *cursor;
+    DB_TXN *tid = NULL;
     int err;
     time_t now = time(NULL);
     char *buf = NULL;
@@ -456,7 +458,7 @@ static int doupdate(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logC
         log_db_error(logContext, err, "starting transaction");
         goto doupdate_fail;
     }
-    DB_TXN *tid = dbEnv->m_environment->m_transaction;
+    tid = dbEnv->m_environment->m_transaction;
     if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
         log_db_error(logContext, err, "creating cursor");
         goto doupdate_fail;
@@ -549,6 +551,7 @@ static int whitelist(const abl_args *args, PamAbleDbEnv *dbEnv, int isHost, cons
     int err = 0;
     DBT key, data;
     DBC *cursor = NULL;
+    DB_TXN *tid = NULL;
     int del = 0;
     char *buf = NULL;
     u_int32_t bsz = 0;
@@ -571,7 +574,7 @@ static int whitelist(const abl_args *args, PamAbleDbEnv *dbEnv, int isHost, cons
         log_db_error(logContext, err, "starting transaction");
         goto whitelist_fail;
     }
-    DB_TXN *tid = dbEnv->m_environment->m_transaction;
+    tid = dbEnv->m_environment->m_transaction;
 
     if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
         log_db_error(logContext, err, "creating cursor");

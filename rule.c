@@ -216,40 +216,6 @@ static int check_clause(log_context *log, const char **rp,
     return rule_matchperiods(log, history, now, rp);
 }
 
-/* Apply a rule to a history record returning 1 if the rule matches, 0 if the
- * rule fails.
- *
- * Rule syntax is like:
- *
- * word         ::= /[^\s\|\/\*]+/
- * name         ::= word | '*'
- * username     ::= name
- * servicename  ::= name
- * userservice  ::= username
- *              |   username '/' servicename
- * namelist     ::= userservice
- *              |   userservice '|' namelist
- * userspec     ::= namelist
- *              |   '!' namelist
- * multiplier   ::= 's' | 'm' | 'h' | 'd'
- * number       ::= /\d+/
- * period       ::= number
- *              |   number multiplier
- * trigger      ::= number '/' period
- * triglist     ::= trigger
- *              |   trigger ',' triglist
- * userclause   ::= userspec ':' triglist
- * rule         ::= userclause
- *              |   userclause /\s+/ rule
- *
- * This gives rise to rules like
- *
- * !root|admin/sshd:10/1m,100/1d root:10/3m
- *
- * which means for accounts other than 'root' or 'admin' trigger if there were ten
- * or more events in the last minute or 100 or more events in the last day. For
- * 'root' trigger if there were ten or more events in the last three minutes.
- */
 BlockState rule_test(log_context *log, const char *rule,
               const char *user, const char *service,
               AuthState *history, time_t now) {

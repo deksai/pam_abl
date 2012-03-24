@@ -36,7 +36,8 @@ if( NOT CMAKE_BUILD_TYPE)
 endif( NOT CMAKE_BUILD_TYPE)
 
 include_directories(${DB_INCLUDE_DIR} ${PAM_INCLUDE_DIRS})
-add_definitions(-W -Wall -Wshadow -Winit-self -Wredundant-decls -Wcast-align -Wfloat-equal -Winline -Wunreachable-code -Wmissing-declarations -Wswitch-enum -Wswitch-default -Wmain -Wextra)
+add_definitions(-W -Wall -Wshadow -Winit-self -Wredundant-decls -Wcast-align -Wfloat-equal -Winline -Wunreachable-code
+				-Wmissing-declarations -Wswitch-enum -Wswitch-default -Wformat -Wmain -Wextra -Wunused -Wmissing-noreturn)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 add_executable(pam-able_bin ${PAM_ABLE_COMMON_SRC} ${PAM_ABLE_TOOLS_SRC})

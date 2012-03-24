@@ -21,7 +21,7 @@ void destroyLogContext(log_context *context) {
     free(context);
 }
 
-void log_out(int pri, const char *format, ...) {
+static void log_out(int pri, const char *format, ...) {
     va_list ap;
     va_start(ap, format);
 #if defined(TEST) || defined(TOOLS)
