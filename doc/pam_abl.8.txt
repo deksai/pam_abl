@@ -67,6 +67,17 @@ Ignored
 |config|Path to the configuration file.|
 The configuration file contains additional arguments. In order for the pam_abl command line tool to work correctly most of the configuration should be placed in the config file rather than being provided by arguments. The format of the config file is described below.
 
+|limits|Minimum and maximum number of attempts to keep.|
+It's value should have the following syntax "<minimum>-<maximum>".
+If you do not block machines that do too many attempts, the db can easily become bloated.
+To prevent this we introduced this setting. As soon as there are a <maximum> number of attempts
+for a user/host, the number of stored attempts is reduced to <minimum>. A <maximum> of 0 means no limits.
+Make sure that <minimum> is larger then any rule specified. We recommend a value of "1000-1200".
+
+|db_home|Directory for db locking and logging files.|
+Path to a directory where Berkeley DB can place it's locking and logging files.
+Make sure this dir is writable.
+
 |host_db|Path to host database file.|
 Path to the Berkeley DB which is used to log the host responsible for failed
 authentication attempts.
@@ -78,6 +89,9 @@ day.
 |host_rule|Rule for host blacklisting.|
 The rule (see below for format) which defines the conditions under which a
 failed hosts will be blackisted.
+
+|host_whitelist|Host that do not need to be tracked.|
+;-seperated list of host that do not need to be tracked.
 
 |host_blk_cmd|Host block command |
 Command that should be run when a host is checked, and is currently blocked.
@@ -104,6 +118,10 @@ day.
 |user_rule|Rule for user blacklisting.|
 The rule (see below for format) which defines the conditions under which a
 failed users will be blackisted.
+
+|user_whitelist|Users that do not need to be tracked.|
+;-seperated list of users whose attempts do not need to be recorded.
+This does not prevent the machine they are using from being blocked.
 
 |user_blk_cmd|Host block command |
 Command that should be run when a user is checked, and is currently blocked.
@@ -161,6 +179,8 @@ pam_abl.conf(5), pam_abl(1)
 
 AUTHORS
 -------
+
+Lode Mertens <lodemertens@hotmail.com>
 
 Andy Armstrong <andy@hexten.net>
 

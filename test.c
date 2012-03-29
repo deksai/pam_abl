@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <string.h>
 
+#include "dbfun.h"
+
 void removeDir(const char *dirname) {
     DIR *dir;
     struct dirent *entry;
@@ -36,6 +38,7 @@ void makeDir(const char *dirname) {
 }
 
 int main() {
+    printf("Using db version \"%s\" %d.%d.%d\n", DB_VERSION_STRING, DB_VERSION_MAJOR, DB_VERSION_MINOR, DB_VERSION_PATCH);
     runTypeTests();
     runDatabaseTests();
     runtRuleTests();

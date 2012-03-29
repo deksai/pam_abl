@@ -31,6 +31,13 @@ set(PAM_ABLE_TEST_SRC
 find_package(BerkeleyDB REQUIRED)
 find_package(Pam REQUIRED)
 
+#building pam-abl using a different version of Berkeley db
+#uncomment the following lines and fill in the correct paths/versions
+#set(DB_LIBRARY <db version "db4.7">)
+#set(DB_INCLUDE_DIR <db source dir>/include)
+#link_directories(<db library dir>/lib)
+
+#if you want a debug build, please add "-DCMAKE_BUILD_TYPE=Debug" as param to the cmake call
 if( NOT CMAKE_BUILD_TYPE)
 	set( CMAKE_BUILD_TYPE Release)
 endif( NOT CMAKE_BUILD_TYPE)

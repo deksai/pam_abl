@@ -51,12 +51,19 @@ NON-PAM INTERACTION
         Prints 'name: status' if verboseness is specified.
         If more than one host or user is given, checks only the first host/user
         pair.
+*-u, --update*::
+	Update the state of all users/hosts in the db.
+	This will also cause the appropriate scripts to be called.
 *-s, --service*::
         Operate in context of specified service.  Defaults to 'none'.
 *-U, --user*::
         Operate on user (wildcards are ok for whitelisting).
 *-H, --host*::
         Operate on host (wildcards are ok for whitelisting).
+*-R, --reason*::
+	Only used when -f is provided (defaults to "AUTH").
+	Specifies why the authentication failed.
+	Possible values are USER, HOST, BOTH, AUTH
 
 If you specified commands to run in your configuration, those commands will try
 to run if the host or user switches state (blocked <-> clear) since the last
@@ -88,9 +95,9 @@ Unblock all example.com, somewhere.com hosts:
 $ pam_abl -w -H \*.example.com -H \*.somewhere.com
 ***********************************************************************
 
-Fail the host badguy.com and the user joe:
+Fail the host badguy.com and the user joe because the authentication failed:
 ***********************************************************************
-$ pam_abl -f -H badguy.com -U joe
+$ pam_abl -f -H badguy.com -U joe -R AUTH
 ***********************************************************************
 
 Check whether joe is currently allowed to use your neato service from somehost,
@@ -99,8 +106,15 @@ running the necessary commands if he switches state:
 $ pam_abl -c -U joe -H somehost -s neato
 ***********************************************************************
 
+Because the user/host state is only updated when an attempt is made, you can
+manually force pam-abl to update the states and call the correct scripts:
+***********************************************************************
+$ pam_abl -u
+***********************************************************************
+
 AUTHORS
 -------
+Lode Mertens <lodemertens@hotmail.com>
 
 Andy Armstrong <andy@hexten.net>
 
@@ -109,7 +123,7 @@ Chris Tasma <pam-abl@deksai.com>
 
 REPORTING BUGS
 --------------
-Report bugs to <pam-abl@deksai.com>
+Report bugs to <pam-abl@deksai.com> or using the bugtracker on sourceforge.
 
 SEE ALSO
 --------

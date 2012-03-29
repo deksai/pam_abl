@@ -652,7 +652,7 @@ whitelist_fail:
     free(buf);
 #if DB_VERSION_MAJOR < 5
     if (cursor != NULL)
-        cursor->close(cursor);
+        cursor->c_close(cursor);
 #else
     if (cursor != NULL)
         cursor->close(cursor);

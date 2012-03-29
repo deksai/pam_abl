@@ -128,6 +128,20 @@ with the exception of debug and no_warn these are ignored.
 
 The arguments that are specific to the PAM module are as follows:
 
+*db_home*::
+Specify the directory where the Berkeley db
+can store it's lock and log files. Make sure
+this dir exists and is writable.
+
+*limits*::
+It's value should have the following syntax "<minimum>-<maximum>".
+If you do not block machines that do too many attempts, the db can 
+easily become bloated. To prevent this we introduced this setting. 
+As soon as there are a <maximum> number of attempts for a user/host, 
+the number of stored attempts for this user/host is reduced to <minimum>. 
+A <maximum> of 0 means no limits. Make sure that <minimum> is larger 
+then any rule specified. We recommend a value of "1000-1200".
+
 *host_db, user_db*::
 Specify the name of the databases that will   
 be used to log failed authentication          
@@ -183,6 +197,12 @@ checked.  If there isn't enough information to fulfill the requested
 substitutions (eg. running the pam_abl tool without specifying all the
 necessary fields), the command will simply not run.
 
+*host_whitelist, user_whitelist*::
+;-seperated list of hosts/users whose attempts will not be recorded. 
+So if an attempt is made from "10.10.10.10" for user "root" and "root" 
+is in the whitelist, only an attempt for his machine is recorded.
+If a user is whitelisted, this does not prevent his machine from being blocked.
+
 EXAMPLE
 -------
 
@@ -206,6 +226,8 @@ pam_abl.conf(5), pam_abl(1)
 
 AUTHORS
 -------
+
+Lode Mertens <lodemertens@hotmail.com>
 
 Andy Armstrong <andy@hexten.net> +
 

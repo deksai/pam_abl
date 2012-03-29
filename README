@@ -1,0 +1,49 @@
+Welcome to pam-abl.
+
+1) Introduction
+2) Building
+3) Supported databases
+
+
+
+1) Introduction
+pam_abl is a pam module designed to automatically block hosts which are attempting a brute force attack. Brute force attacks are an unsophisticated way to find authentication credentials. Basically, a computer is setup to try all kinds of user names and password combinations until one works. It may sound fairly far fetched, but it does actually work. Many system accounts have common user names. Passwords are also easily guessable in many situations. 
+
+
+
+2) Building
+As you may have noticed pam-abl doesn't come with a normal makefile, mostly because I find them to complicated for what they need to do. That's why I decided to go with cmake. CMake is a family of tools designed to build, test and package software. You can download your copy from their website (http://www.cmake.org/). Eventually the idea is to build packages for most common distributions using cmake.
+
+So what do you need to do to build this version. 
+a. Pick yourself a build directory. It can be the directory with the sources.
+      mkdir cmake_build
+b. cd to that dir
+      cd cmake_build
+c. call cmake with as argument the top level project directory. This will generate a makefile.
+      cmake ../
+d. call make
+      make
+
+The build process will make 3 targets:
+a. The library "pam-able.so"
+b. The commandline tool "pam-able"
+c. A test executable "pam-able_test". Really handy for testing it with different db versions
+Currently the targets are called pam-able (stands for pam-abl extended) because this version was developed separately from pam-abl but starting from the sources from pam-abl.
+
+Building using different version of Berkeley db.
+For the moment you will have to manually change the cmake file "CMakeLists.txt". See this file for more details. Eventually we hope to change this to be more automatic.
+
+
+
+3) Supported databases
+Currently pam-abl is tested with the following versions of Berkeley db:
+ - db-5.3.15
+ - db-5.2.42
+ - db-5.1.25
+ - db-4.8.30
+ - db-4.7.25
+ - db-4.6.21
+ - db-4.5.20
+ - db-4.4.20
+
+Versions  <= 4.3 are currently no longer supported.
