@@ -1,8 +1,7 @@
 /*
  *   pam_abl - a PAM module and program for automatic blacklisting of hosts and users
  *
- *   Copyright (C) 2005 Andy Armstrong andy@hexten.net
- *   Copyright (C) 2009 Chris Tasma pam-abl@deksai.com
+ *   Copyright (C) 2005-2012
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by

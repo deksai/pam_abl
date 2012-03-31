@@ -31,7 +31,7 @@ c. A test executable "pam-able_test". Really handy for testing it with different
 Currently the targets are called pam-able (stands for pam-abl extended) because this version was developed separately from pam-abl but starting from the sources from pam-abl.
 
 Building using different version of Berkeley db.
-For the moment you will have to manually change the cmake file "CMakeLists.txt". See this file for more details. Eventually we hope to change this to be more automatic.
+See the build file "CMakeLists.txt" for more details.
 
 
 
