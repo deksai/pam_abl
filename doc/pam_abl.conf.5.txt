@@ -202,6 +202,7 @@ necessary fields), the command will simply not run.
 So if an attempt is made from "10.10.10.10" for user "root" and "root" 
 is in the whitelist, only an attempt for his machine is recorded.
 If a user is whitelisted, this does not prevent his machine from being blocked.
+Hosts can be specified using their IP (1.1.1.1) or using a netmask (1.1.1.1/24)
 
 EXAMPLE
 -------

@@ -332,7 +332,7 @@ static void testRecordAttemptWhitelistHost() {
     memset(&args, 0, sizeof(abl_args));
     args.host_purge = 60*60*24; //1 day
     args.user_purge = 60*60*24; //1 day
-    args.host_whitelist = "1.1.1.1;2.2.2.2;127.0.0.1";
+    args.host_whitelist = "1.1.1.1;2.2.2.2/32;127.0.0.1";
     args.user_whitelist = "blaat1;username;blaat3";
 
     abl_info info;
@@ -526,6 +526,232 @@ static void testOpenOnlyUserDb() {
     removeDir(TEST_DIR);
 }
 
+static u_int32_t getIp(int x, int y, int z, int j) {
+    u_int32_t ip = x;
+    ip = (ip << 8) + y;
+    ip = (ip << 8) + z;
+    ip = (ip << 8) + j;
+    return ip;
+}
+
+static int validIpComponents[]   = {  0,  1,   2, 100,  253,   254,  255 };
+static int invalidIpComponents[] = { -2, -1, 256, 257, 1024, 01245,  5000};
+
+static void testParseIpValid() {
+    char buffer[100];
+    int bufSize = sizeof(validIpComponents)/sizeof(int);
+    int x = 0;
+    for (; x < bufSize; ++x) {
+        int y = 0;
+        for (; y < bufSize; ++y) {
+            int z = 0;
+            for (; z < bufSize; ++z) {
+                int j = 0;
+                for (; j < bufSize; ++j) {
+                    snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], validIpComponents[y], validIpComponents[z], validIpComponents[j]);
+                    u_int32_t expectedIp = getIp(validIpComponents[x], validIpComponents[y], validIpComponents[z], validIpComponents[j]);
+                    size_t strLen = strlen(&buffer[0]);
+                    //let's try to mess things up by not letting the string end with \0
+                    //but instead add an extra '0', if the parsing does not use the length given
+                    //it will probably parse the extra 0
+                    buffer[strLen] = '0';
+                    buffer[strLen+1] = '\0';
+                    int netmask = 0;
+                    u_int32_t parsedIp;
+                    buffer[strLen] = '\0';
+                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) != 0) {
+                        printf("   IP parsing failed for %s.\n", &buffer[0]);
+                    } else {
+                        if (parsedIp != expectedIp || netmask != -1)
+                            printf("   IP parsing failed for %s, result was not as expected\n", &buffer[0]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+static char *invalidIps[] = {
+    "....",
+    "blaat",
+    "0t.0.0.0",
+    "",
+    "1.1.11",
+    "1.1..1"
+};
+
+static void testParseIpInvalid() {
+    char buffer[100];
+    int bufSize = sizeof(validIpComponents)/sizeof(int);
+    int netmask = 0;
+    u_int32_t parsedIp;
+    int x = 0;
+    for (; x < bufSize; ++x) {
+        int y = 0;
+        for (; y < bufSize; ++y) {
+            int z = 0;
+            for (; z < bufSize; ++z) {
+                int j = 0;
+                for (; j < bufSize; ++j) {
+                    snprintf(&buffer[0], 100, "%d.%d.%d.%d", invalidIpComponents[x], validIpComponents[y], validIpComponents[z], validIpComponents[j]);
+                    size_t strLen = strlen(&buffer[0]);
+                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
+                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+
+                    snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], invalidIpComponents[y], validIpComponents[z], validIpComponents[j]);
+                    strLen = strlen(&buffer[0]);
+                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
+                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+
+                    snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], validIpComponents[y], invalidIpComponents[z], validIpComponents[j]);
+                    strLen = strlen(&buffer[0]);
+                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
+                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+
+                    snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], validIpComponents[y], validIpComponents[z], invalidIpComponents[j]);
+                    strLen = strlen(&buffer[0]);
+                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
+                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+                }
+            }
+        }
+    }
+
+    x=0;
+    for (; x< (int)(sizeof(invalidIps)/sizeof(char*)); ++x) {
+        if (parseIP(invalidIps[x], strlen(invalidIps[x]), &netmask, &parsedIp) == 0)
+            printf("   IP parsing succeeded for %s.\n", invalidIps[x]);
+    }
+}
+
+static void testParseIpValidWithNetmask() {
+    char buffer[100];
+    int x = 0;
+    int netmask = 0;
+    u_int32_t parsedIp;
+    for (; x <= 32; ++x) {
+        snprintf(&buffer[0], 100, "1.1.1.1/%d", x);
+        size_t strLen = strlen(&buffer[0]);
+        buffer[strLen] = '0';
+        buffer[strLen+1] = '\0';
+        if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) != 0)
+            printf("   IP parsing failed for %s.\n", invalidIps[x]);
+       else if (netmask != x) {
+            printf("   IP parsing failed for %s: Invalid netmwask returned.\n", invalidIps[x]);
+        }
+    }
+}
+
+static char *invalidIpsWithNetmask[] = {
+    "1.1.1.1/33",
+    "1.1.1.1/-1",
+    "1.1.1.1:2",
+    "1.1.1.1-5",
+    "1.1.1.1.1",
+    "1.1.1.1/1000",
+    "1.1.1.1/000000033",
+    "1.1.1/2",
+    "1.1.1.1/pol",
+    "1.1.1.1/",
+};
+
+
+static void testParseIpInvalidWithNetmask() {
+    int netmask = 0;
+    u_int32_t parsedIp;
+    int x=0;
+    for (; x< (int)(sizeof(invalidIpsWithNetmask)/sizeof(char*)); ++x) {
+        if (parseIP(invalidIpsWithNetmask[x], strlen(invalidIpsWithNetmask[x]), &netmask, &parsedIp) == 0)
+            printf("   IP parsing succeeded for %s.\n", invalidIpsWithNetmask[x]);
+    }
+}
+
+static void testInSameSubnet() {
+    u_int32_t ip = getIp(192,168,1,1);
+    int x = 0;
+    for (; x < 256; ++x) {
+        u_int32_t host = getIp(192,168,1,x);
+        if (inSameSubnet(host, ip, 24) == 0) {
+            printf("   testInSameSubnet failed.\n");
+        }
+        if (x != 192) {
+            host = getIp(x,168,1,1);
+            if (inSameSubnet(host, ip, 24)) {
+                printf("   testInSameSubnet failed.\n");
+            }
+        }
+        if (x != 168) {
+            host = getIp(192,x,1,1);
+            if (inSameSubnet(host, ip, 24)) {
+                printf("   testInSameSubnet failed.\n");
+            }
+        }
+        if (x != 1) {
+            host = getIp(192,168,x,1);
+            if (inSameSubnet(host, ip, 24)) {
+                printf("   testInSameSubnet failed.\n");
+            }
+        }
+    }
+
+    ip = getIp(128,128,128,128);
+    for (x=0; x < 256; ++x) {
+        u_int32_t host = getIp(128,128,128,x);
+        if (x == 128) {
+            if (inSameSubnet(host, ip, 32) == 0)
+                printf("   testInSameSubnet failed.\n");
+        } else {
+            if (inSameSubnet(host, ip, 32))
+                printf("   testInSameSubnet failed.\n");
+        }
+    }
+
+    if (inSameSubnet(getIp(1,1,1,1), ip, 0) == 0)
+        printf("   the 0 subnet should contain all ip's.\n");
+
+    if (inSameSubnet(getIp(255,255,255,255), ip, 0) == 0)
+        printf("   the 0 subnet should contain all ip's.\n");
+}
+
+static char *whiteListed[] = {
+    "10.10.10.10",
+    "10.10.10.0",
+    "10.10.10.255",
+    "1.1.1.1",
+    "2.2.2.2",
+    "blaat",
+    "192.168.1.1",
+    "192.168.1.0",
+    "192.168.1.255"
+};
+
+static char *notWhiteListed[] = {
+    "10.10.09.255",
+    "10.10.11.0",
+    "1.1.1.0",
+    "1.1.1.2",
+    "2.2.2.1",
+    "2.2.2.3",
+    "lorem",
+    "192.168.0.255",
+    "192.168.2.0",
+};
+
+static void testWhitelistMatch() {
+    const char *hostWhitelist = "10.10.10.10/24;1.1.1.1;2.2.2.2/32;blaat;192.168.1.1/24";
+    int x=0;
+    for (; x< (int)(sizeof(whiteListed)/sizeof(char*)); ++x) {
+        if (whitelistMatch(whiteListed[x], hostWhitelist, 1) == 0) {
+            printf("   %s was not whitelisted\n", whiteListed[x]);
+        }
+    }
+
+    for (x=0; x< (int)(sizeof(notWhiteListed)/sizeof(char*)); ++x) {
+        if (whitelistMatch(notWhiteListed[x], hostWhitelist, 1) != 0) {
+            printf("   %s was whitelisted\n", notWhiteListed[x]);
+        }
+    }
+}
 
 void testAble() {
     printf("Able test start.\n");
@@ -543,5 +769,17 @@ void testAble() {
     testOpenOnlyHostDb();
     printf(" Starting testOpenOnlyUserDb.\n");
     testOpenOnlyUserDb();
+    printf(" Starting testParseIpValid.\n");
+    testParseIpValid();
+    printf(" Starting testParseIpInvalid.\n");
+    testParseIpInvalid();
+    printf(" Starting testParseIpValidWithNetmask.\n");
+    testParseIpValidWithNetmask();
+    printf(" Starting testParseIpInvalidWithNetmask.\n");
+    testParseIpInvalidWithNetmask();
+    printf(" Starting testInSameSubnet.\n");
+    testInSameSubnet();
+    printf(" Starting testWhitelistMatch.\n");
+    testWhitelistMatch();
     printf("Able test end.\n");
 }

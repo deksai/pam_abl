@@ -91,7 +91,9 @@ The rule (see below for format) which defines the conditions under which a
 failed hosts will be blackisted.
 
 |host_whitelist|Host that do not need to be tracked.|
-;-seperated list of host that do not need to be tracked.
+;-seperated list of host that do not need to be tracked. 
+You can specify single IP addresses here or use subnets.
+For example 1.1.1.1 or 1.1.1.1/24
 
 |host_blk_cmd|Host block command |
 Command that should be run when a host is checked, and is currently blocked.

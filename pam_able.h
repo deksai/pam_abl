@@ -83,4 +83,13 @@ BlockState check_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_in
     If something went wrong, a non zero value is returned and a diagnostic message is logged using the logContext
 */
 int record_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
+
+
+/*
+  Following functions are only 'exported' for testing purposes
+*/
+int parseIP(const char *ipStr, size_t length, int *netmask, u_int32_t *ip);
+int whitelistMatch(const char *subject, const char *whitelist, int isHost);
+int inSameSubnet(u_int32_t host, u_int32_t ip, int netmask);
+
 #endif

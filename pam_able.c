@@ -21,8 +21,10 @@
 #include "dbfun.h"
 #include "rule.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define DB_NAME "state"
 #define COMMAND_SIZE 1024
@@ -304,6 +306,7 @@ BlockState check_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_in
     return updatedHostState == BLOCKED || updatedUserState == BLOCKED ? BLOCKED : CLEAR;
 }
 
+/*
 static int whitelistMatch(const char *subject, const char *whitelist) {
     if (!subject || !whitelist)
         return 0;
@@ -322,6 +325,145 @@ static int whitelistMatch(const char *subject, const char *whitelist) {
         if (memcmp(begin, subject, subjLen) == 0)
             return 1;
     }
+    return 0;
+}
+*/
+
+static int parseNumber(const char *numberStr, size_t length, unsigned max, unsigned *number, size_t *consumedSize) {
+    size_t x = 0;
+    unsigned result = 0;
+    while (x < length) {
+        if (isdigit(numberStr[x])) {
+            result *= 10;
+            result += numberStr[x] - '0';
+            if (result > max)
+                return 1;
+        } else {
+            break;
+        }
+        ++x;
+    }
+    //if no characther parsed, just tell it failed
+    if (!x)
+        return 1;
+    if (number)
+        *number = result;
+    if (consumedSize)
+        *consumedSize = x;
+    return 0;
+}
+
+/*
+  Currently we only support ipv4 addresses
+  If no netmask is found, the netmask param will be -1
+*/
+int parseIP(const char *ipStr, size_t length, int *netmask, u_int32_t *ip) {
+    if (netmask)
+        *netmask = -1;
+    if (ip)
+        *ip = 0;
+    u_int32_t parsedIp = 0;
+
+    size_t consumed = 0;
+    //try to parse the 4 parts of the IP
+    int i = 0;
+    for (; i < 4; ++i) {
+        //can we parse a number from the string
+        size_t used = 0;
+        unsigned parsed = 0;
+        if (parseNumber(&ipStr[consumed], length - consumed, 255, &parsed, &used) != 0)
+            return 1;
+        //if we come here, we have a parsed number stored in parsed
+        consumed += used;
+        parsedIp <<= 8;
+        parsedIp += parsed;
+        //if it's not the last part, we expect there to be a '.'
+        if (i < 3) {
+            if (consumed >= length || ipStr[consumed] != '.')
+                return 1;
+            ++consumed;
+        }
+    }
+    //check if there is still a netmask that we can parse
+    if (consumed < length) {
+        if (ipStr[consumed] != '/')
+            return 1;
+        ++consumed;
+        size_t used = 0;
+        unsigned parsed = 0;
+        if (parseNumber(&ipStr[consumed], length - consumed, 32, &parsed, &used) != 0)
+            return 1;
+        consumed += used;
+        if (netmask)
+            *netmask = parsed;
+    }
+    //did we use every char? If not, it probably was something that looked like a ip, but wasn't
+    if (consumed != length)
+        return 1;
+    if (ip)
+        *ip = parsedIp;
+    return 0;
+}
+
+/*
+  Is the given host ip part of the subnet defined by ip and netmask
+*/
+int inSameSubnet(u_int32_t host, u_int32_t ip, int netmask) {
+    //an invalid netmask never matches
+    if (netmask < 0 || netmask > 32)
+        return 0;
+    //The behaviour of shifts is only defined if the value of the right
+    //operand is less than the number of bits in the left operand.
+    //So shifting a 32-bit value by 32 or more is undefined
+    if (netmask == 0)
+        return 1;
+
+    host >>= (32-netmask);
+    ip >>= (32-netmask);
+    return host == ip;
+}
+
+int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
+    if (!subject || !whitelist)
+        return 0;
+
+    size_t subjLen = strlen(subject);
+    int hostParsed = 0;
+    u_int32_t ip = 0;
+    if (isHost) {
+        int netmask = 0;
+        if (parseIP(subject, subjLen, &netmask, &ip) == 0 && netmask == -1)
+            hostParsed = 1;
+    }
+
+    const char *begin = whitelist;
+    const char *end = NULL;
+    while ((end = strchr(begin, ';')) != NULL) {
+        size_t len = (size_t)(end - begin);
+        if (hostParsed) {
+            int netmask = 0;
+            u_int32_t netmaskIp = 0;
+            if (parseIP(begin, len, &netmask, &netmaskIp) == 0) {
+                if (ip == netmaskIp || (netmask >= 0 && inSameSubnet(ip, netmaskIp, netmask)))
+                    return 1;
+            }
+        }
+        if (subjLen == len && memcmp(begin, subject, subjLen) == 0)
+                return 1;
+        begin = end+1;
+    }
+
+    size_t len = strlen(begin);
+    if (hostParsed) {
+        int netmask = 0;
+        u_int32_t netmaskIp = 0;
+        if (parseIP(begin, len, &netmask, &netmaskIp) == 0) {
+            if (ip == netmaskIp || (netmask >= 0 && inSameSubnet(ip, netmaskIp, netmask)))
+                return 1;
+        }
+    }
+    if (subjLen == len && memcmp(begin, subject, subjLen) == 0)
+        return 1;
     return 0;
 }
 
@@ -346,7 +488,7 @@ static int recordSubject(const PamAbleDbEnv *pamDb, const abl_args *args, abl_in
     //if the db was not opened, or nothing to record on => do nothing
     if (!db || !subject || !*subject)
         return 0;
-    if (whitelistMatch(subject, whitelist))
+    if (whitelistMatch(subject, whitelist, isHost))
         return 0;
     if (!dbEnv || purgeTimeout <= 0)
         return 1;
