@@ -18,15 +18,15 @@
  */
 
 #include "test.h"
-#include "pam_able.h"
+#include "pam_abl.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-#define TEST_DIR "/tmp/pam-able_test-dir"
+#define TEST_DIR "/tmp/pam-abl_test-dir"
 
-static void testPamAbleDbEnv() {
+static void testPamAblDbEnv() {
     //first start off wit a non existing dir, we expect it to fail
     abl_args args;
     memset(&args, 0, sizeof(abl_args));
@@ -34,7 +34,7 @@ static void testPamAbleDbEnv() {
     args.host_db = "/tmpt/blaat/non-existing/hosts.db";
     args.user_db = "/tmpt/blaat/non-existing/users.db";
 
-    PamAbleDbEnv *dummy = openPamAbleDbEnvironment(&args, NULL);
+    PamAblDbEnv *dummy = openPamAblDbEnvironment(&args, NULL);
     if (dummy) {
         printf("   The db could be opened on a non existing environment.\n");
     }
@@ -45,17 +45,16 @@ static void testPamAbleDbEnv() {
     args.db_home = TEST_DIR;
     args.host_db = TEST_DIR"/hosts.db";
     args.user_db = TEST_DIR"/users.db";
-    dummy = openPamAbleDbEnvironment(&args, NULL);
+    dummy = openPamAblDbEnvironment(&args, NULL);
     if (dummy) {
-        destroyPamAbleDbEnvironment(dummy);
+        destroyPamAblDbEnvironment(dummy);
     } else {
         printf("   The db could be opened on a non existing environment.\n");
     }
     removeDir(TEST_DIR);
-//    void destroyPamAbleDbEnvironment(PamAbleDbEnv *env);
 }
 
-static int setupTestEnvironment(PamAbleDbEnv **dbEnv) {
+static int setupTestEnvironment(PamAblDbEnv **dbEnv) {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
     char *userClearBuffer = malloc(100);
@@ -71,7 +70,7 @@ static int setupTestEnvironment(PamAbleDbEnv **dbEnv) {
     args.db_home = TEST_DIR;
     args.host_db = TEST_DIR"/hosts.db";
     args.user_db = TEST_DIR"/users.db";
-    *dbEnv = openPamAbleDbEnvironment(&args, NULL);
+    *dbEnv = openPamAblDbEnvironment(&args, NULL);
     if (!*dbEnv) {
         printf("   The db environment could not be opened.\n");
         return 1;
@@ -130,7 +129,7 @@ static int setupTestEnvironment(PamAbleDbEnv **dbEnv) {
 
 static void checkAttempt(const char *user, const char *userRule, BlockState newUserState,
                          const char *host, const char *hostRule, BlockState newHostState,
-                         const char *service, BlockState expectedBlockState, BlockReason bReason, const PamAbleDbEnv *dbEnv) {
+                         const char *service, BlockState expectedBlockState, BlockReason bReason, const PamAblDbEnv *dbEnv) {
     abl_args args;
     memset(&args, 0, sizeof(abl_args));
     args.host_rule = hostRule;
@@ -181,7 +180,7 @@ static void checkAttempt(const char *user, const char *userRule, BlockState newU
 static void testCheckAttempt() {
     removeDir(TEST_DIR);
 
-    PamAbleDbEnv *dbEnv = NULL;
+    PamAblDbEnv *dbEnv = NULL;
     if (setupTestEnvironment(&dbEnv) || !dbEnv) {
         printf("   Could not create our test environment.\n");
         return;
@@ -228,7 +227,7 @@ static void testCheckAttempt() {
     //user blocked, host blocked, both blocked
     checkAttempt("bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED, dbEnv);
 
-    destroyPamAbleDbEnvironment(dbEnv);
+    destroyPamAblDbEnvironment(dbEnv);
     removeDir(TEST_DIR);
 }
 
@@ -251,7 +250,7 @@ static void testRecordAttempt() {
     info.host = &hostBuffer[0];
     info.service = &serviceBuffer[0];
 
-    PamAbleDbEnv *dbEnv = NULL;
+    PamAblDbEnv *dbEnv = NULL;
     if (setupTestEnvironment(&dbEnv) || !dbEnv) {
         printf("   Could not create our test environment.\n");
         return;
@@ -318,7 +317,7 @@ static void testRecordAttempt() {
     }
     commitTransaction(dbEnv->m_environment);
 
-    destroyPamAbleDbEnvironment(dbEnv);
+    destroyPamAblDbEnvironment(dbEnv);
     removeDir(TEST_DIR);
 }
 
@@ -336,7 +335,7 @@ static void testRecordAttemptWhitelistHost() {
     args.user_whitelist = "blaat1;username;blaat3";
 
     abl_info info;
-    PamAbleDbEnv *dbEnv = NULL;
+    PamAblDbEnv *dbEnv = NULL;
     if (setupTestEnvironment(&dbEnv) || !dbEnv) {
         printf("   Could not create our test environment.\n");
         return;
@@ -426,7 +425,7 @@ static void testRecordAttemptWhitelistHost() {
         printf("   We expected an empty state for the empty user\n");
 
     commitTransaction(dbEnv->m_environment);
-    destroyPamAbleDbEnvironment(dbEnv);
+    destroyPamAblDbEnvironment(dbEnv);
     removeDir(TEST_DIR);
 }
 
@@ -445,7 +444,7 @@ static void testRecordAttemptPurge() {
     info.host = "ch_0";
     info.service = "Cool_Service";
 
-    PamAbleDbEnv *dbEnv = NULL;
+    PamAblDbEnv *dbEnv = NULL;
     if (setupTestEnvironment(&dbEnv) || !dbEnv) {
         printf("   Could not create our test environment.\n");
         return;
@@ -473,7 +472,7 @@ static void testRecordAttemptPurge() {
         }
     }
     commitTransaction(dbEnv->m_environment);
-    destroyPamAbleDbEnvironment(dbEnv);
+    destroyPamAblDbEnvironment(dbEnv);
     if (userState)
         destroyAuthState(userState);
     if (hostState)
@@ -488,7 +487,7 @@ static void testOpenOnlyHostDb() {
     args.db_home = TEST_DIR;
     args.host_db = TEST_DIR"/hosts.db";
     args.user_db = NULL;
-    PamAbleDbEnv *dbEnv = openPamAbleDbEnvironment(&args, NULL);
+    PamAblDbEnv *dbEnv = openPamAblDbEnvironment(&args, NULL);
     if (!dbEnv) {
         printf("   The db environment could not be opened.\n");
         return;
@@ -499,7 +498,7 @@ static void testOpenOnlyHostDb() {
         printf("   The user db was filled in.\n");
     if (!dbEnv->m_hostDb)
         printf("   The host db was not filled in.\n");
-    destroyPamAbleDbEnvironment(dbEnv);
+    destroyPamAblDbEnvironment(dbEnv);
     removeDir(TEST_DIR);
 }
 
@@ -511,7 +510,7 @@ static void testOpenOnlyUserDb() {
     args.db_home = TEST_DIR;
     args.host_db = NULL;
     args.user_db = TEST_DIR"/users.db";
-    PamAbleDbEnv *dbEnv = openPamAbleDbEnvironment(&args, NULL);
+    PamAblDbEnv *dbEnv = openPamAblDbEnvironment(&args, NULL);
     if (!dbEnv) {
         printf("   The db environment could not be opened.\n");
         return;
@@ -522,7 +521,7 @@ static void testOpenOnlyUserDb() {
         printf("   The user db was not filled in.\n");
     if (dbEnv->m_hostDb)
         printf("   The host db was filled in.\n");
-    destroyPamAbleDbEnvironment(dbEnv);
+    destroyPamAblDbEnvironment(dbEnv);
     removeDir(TEST_DIR);
 }
 
@@ -753,10 +752,10 @@ static void testWhitelistMatch() {
     }
 }
 
-void testAble() {
-    printf("Able test start.\n");
-    printf(" Starting testPamAbleDbEnv.\n");
-    testPamAbleDbEnv();
+void testAbl() {
+    printf("Abl test start.\n");
+    printf(" Starting testPamAblDbEnv.\n");
+    testPamAblDbEnv();
     printf(" Starting testCheckAttempt.\n");
     testCheckAttempt();
     printf(" Starting testRecordAttempt.\n");
@@ -781,5 +780,5 @@ void testAble() {
     testInSameSubnet();
     printf(" Starting testWhitelistMatch.\n");
     testWhitelistMatch();
-    printf("Able test end.\n");
+    printf("Abl test end.\n");
 }

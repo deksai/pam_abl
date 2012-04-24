@@ -61,6 +61,6 @@ int main() {
     runTypeTests();
     runDatabaseTests();
     runtRuleTests();
-    testAble();
+    testAbl();
     return 0;
 }

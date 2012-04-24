@@ -17,7 +17,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pam_able.h"
+#include "pam_abl.h"
 #include "rule.h"
 #include "config.h"
 #include <stdio.h>
@@ -171,7 +171,7 @@ static void showblocking(const char *rule, AuthState *history, time_t now, log_c
     }
 }
 
-static int doshow(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logContext, int isHost) {
+static int doshow(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logContext, int isHost) {
     DB *db=NULL;
     DBT key, data;
     DBC *cursor;
@@ -298,7 +298,7 @@ doshow_fail:
     return err;
 }
 
-static int dopurge(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logContext, int isHost) {
+static int dopurge(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logContext, int isHost) {
     DB *db = NULL;
     DBT key, data;
     DBC *cursor;
@@ -424,7 +424,7 @@ dopurge_fail:
     return err;
 }
 
-static int doupdate(const abl_args *args, PamAbleDbEnv *dbEnv, log_context *logContext, int isHost) {
+static int doupdate(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logContext, int isHost) {
     DB *db = NULL;
     DBT key, data;
     DBC *cursor;
@@ -545,7 +545,7 @@ doupdate_fail:
     return err;
 }
 
-static int whitelist(const abl_args *args, PamAbleDbEnv *dbEnv, int isHost, const char **permit, int count, log_context *logContext) {
+static int whitelist(const abl_args *args, PamAblDbEnv *dbEnv, int isHost, const char **permit, int count, log_context *logContext) {
     DB *db = NULL;
     int err = 0;
     DBT key, data;
@@ -665,7 +665,7 @@ whitelist_fail:
     return err;
 }
 
-static int fail(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
+static int fail(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
     if (args == NULL || info == NULL || dbEnv == NULL)
         return 0;
 
@@ -801,7 +801,7 @@ int main(int argc, char **argv) {
 
     /* Most everything should be set, and it should be safe to open the
      * databases. */
-    PamAbleDbEnv *dbEnv = openPamAbleDbEnvironment(args, logContext);
+    PamAblDbEnv *dbEnv = openPamAblDbEnvironment(args, logContext);
     if (!dbEnv) {
         return 1;
     }
@@ -865,7 +865,7 @@ int main(int argc, char **argv) {
 
 main_done:
     if (dbEnv)
-        destroyPamAbleDbEnvironment(dbEnv);
+        destroyPamAblDbEnvironment(dbEnv);
     if (args)
         config_free(args);
     if (logContext)

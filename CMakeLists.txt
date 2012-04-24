@@ -1,27 +1,27 @@
 cmake_minimum_required (VERSION 2.6)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-project(pam-able)
-set(PAM_ABLE_COMMON_SRC
+project(pam-abl)
+set(PAM_ABL_COMMON_SRC
 	config.c
 	dbfun.c
 	log.c
-	pam_able.c
+	pam_abl.c
 	rule.c
 	typefun.c
 )
 
 
-set(PAM_ABLE_TOOLS_SRC
+set(PAM_ABL_TOOLS_SRC
 	tools.c
 )
 
-set(PAM_ABLE_LIB_SRC
+set(PAM_ABL_LIB_SRC
 	pam_functions.c
 )
 
-set(PAM_ABLE_TEST_SRC
-	test_able.c
+set(PAM_ABL_TEST_SRC
+	test_abl.c
 	test.c
 	test_db.c
 	test_rule.c
@@ -55,20 +55,20 @@ add_definitions(-W -Wall -Wshadow -Winit-self -Wredundant-decls -Wcast-align -Wf
 				-Wmissing-declarations -Wswitch-enum -Wswitch-default -Wformat -Wmain -Wextra -Wunused -Wmissing-noreturn)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
-add_executable(pam-able_bin ${PAM_ABLE_COMMON_SRC} ${PAM_ABLE_TOOLS_SRC})
-set_target_properties(pam-able_bin PROPERTIES OUTPUT_NAME pam-able)
-set_target_properties(pam-able_bin PROPERTIES COMPILE_DEFINITIONS "TOOLS")
-target_link_libraries(pam-able_bin ${DB_LIBRARY} )
+add_executable(pam-abl_bin ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TOOLS_SRC})
+set_target_properties(pam-abl_bin PROPERTIES OUTPUT_NAME pam-abl)
+set_target_properties(pam-abl_bin PROPERTIES COMPILE_DEFINITIONS "TOOLS")
+target_link_libraries(pam-abl_bin ${DB_LIBRARY} )
 
-add_executable(pam-able_test ${PAM_ABLE_COMMON_SRC} ${PAM_ABLE_TEST_SRC})
-set_target_properties(pam-able_test PROPERTIES COMPILE_DEFINITIONS "TEST")
-target_link_libraries(pam-able_test ${DB_LIBRARY} )
+add_executable(pam-abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
+set_target_properties(pam-abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
+target_link_libraries(pam-abl_test ${DB_LIBRARY} )
 
-add_library(pam-able_lib SHARED ${PAM_ABLE_COMMON_SRC} ${PAM_ABLE_LIB_SRC}) 
-set_target_properties(pam-able_lib PROPERTIES OUTPUT_NAME pam-able)
-target_link_libraries(pam-able_lib ${DB_LIBRARY} ${PAM_LIBRARY})
+add_library(pam-abl_lib SHARED ${PAM_ABL_COMMON_SRC} ${PAM_ABL_LIB_SRC})
+set_target_properties(pam-abl_lib PROPERTIES OUTPUT_NAME pam-abl)
+target_link_libraries(pam-abl_lib ${DB_LIBRARY} ${PAM_LIBRARY})
 
-INSTALL(TARGETS pam-able_bin
+INSTALL(TARGETS pam-abl_bin
 	RUNTIME DESTINATION bin
 )
-INSTALL(TARGETS pam-able_lib DESTINATION lib/security)
+INSTALL(TARGETS pam-abl_lib DESTINATION lib/security)

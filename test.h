@@ -35,6 +35,6 @@ void runDatabaseTests();
 //test to test the purging and rule matching
 void runtRuleTests();
 //test to test how an attempot should be handled
-void testAble();
+void testAbl();
 
 #endif

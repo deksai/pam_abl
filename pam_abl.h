@@ -17,17 +17,17 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PAM_ABLE_H
-#define PAM_ABLE_H
+#ifndef PAM_ABL_H
+#define PAM_ABL_H
 
 #include "config.h"
 #include "dbfun.h"
 
-typedef struct PamAbleDbEnv {
+typedef struct PamAblDbEnv {
     DbEnvironment *m_environment;
     Database      *m_userDb;
     Database      *m_hostDb;
-} PamAbleDbEnv;
+} PamAblDbEnv;
 
 
 typedef struct {
@@ -44,13 +44,13 @@ typedef struct {
   \return a valid environment on success, otherwise a nullptr
   \note f something goes wrong, error messages are written to the logContext
 */
-PamAbleDbEnv *openPamAbleDbEnvironment(abl_args *args, log_context *logContext);
+PamAblDbEnv *openPamAblDbEnvironment(abl_args *args, log_context *logContext);
 
 /*
   Close a full environment. Make sure no transaction is open
   \note Do not use the env pointer anymore after calling this function
 */
-void destroyPamAbleDbEnvironment(PamAbleDbEnv *env);
+void destroyPamAblDbEnvironment(PamAblDbEnv *env);
 
 /*
   Call the desired scripts if possible
@@ -73,7 +73,7 @@ int runUserCommand(BlockState bState, const abl_args *args, abl_info *info, log_
     If something goes wrong while checking, CLEAR is returned
     and diagnostic messages are written using the given logContext.
 */
-BlockState check_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
+BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
 
 /*
     Record an authentication attempt.
@@ -82,7 +82,7 @@ BlockState check_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_in
         - add an entry for the given host and user with as reason info->blockReason
     If something went wrong, a non zero value is returned and a diagnostic message is logged using the logContext
 */
-int record_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
+int record_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
 
 
 /*

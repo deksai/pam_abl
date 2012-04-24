@@ -26,7 +26,7 @@
 
 #include <db.h>
 
-#define MODULE_NAME "pam-able"
+#define MODULE_NAME "pam-abl"
 
 #define UNUSED(x) (void)(x)
 

@@ -17,7 +17,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pam_able.h"
+#include "pam_abl.h"
 #include "dbfun.h"
 #include "rule.h"
 
@@ -145,7 +145,7 @@ int runUserCommand(BlockState bState, const abl_args *args, abl_info *info, log_
     return runCommand(command, info, logContext);
 }
 
-PamAbleDbEnv *openPamAbleDbEnvironment(abl_args *args, log_context *logContext) {
+PamAblDbEnv *openPamAblDbEnvironment(abl_args *args, log_context *logContext) {
     if (!args || !args->db_home || !*args->db_home)
         return NULL;
 
@@ -175,12 +175,12 @@ PamAbleDbEnv *openPamAbleDbEnvironment(abl_args *args, log_context *logContext) 
         }
     }
 
-    PamAbleDbEnv *retValue = malloc(sizeof(PamAbleDbEnv));
+    PamAblDbEnv *retValue = malloc(sizeof(PamAblDbEnv));
     if (!retValue) {
         log_error(logContext, "Memory allocation failed while opening the databases.");
         goto open_fail;
     }
-    memset(retValue, 0, sizeof(PamAbleDbEnv));
+    memset(retValue, 0, sizeof(PamAblDbEnv));
     retValue->m_environment = environment;
     retValue->m_hostDb = hostDb;
     retValue->m_userDb = userDb;
@@ -196,7 +196,7 @@ open_fail:
     return NULL;
 }
 
-void destroyPamAbleDbEnvironment(PamAbleDbEnv *env) {
+void destroyPamAblDbEnvironment(PamAblDbEnv *env) {
     if (!env)
         return;
     if (env->m_hostDb)
@@ -250,7 +250,7 @@ static int update_status(Database *db, const char *subject, const char *service,
     return err;
 }
 
-BlockState check_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
+BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
     if (info)
         info->blockReason = AUTH_FAILED;
 
@@ -467,7 +467,7 @@ int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
     return 0;
 }
 
-static int recordSubject(const PamAbleDbEnv *pamDb, const abl_args *args, abl_info *info, log_context *logContext, int isHost) {
+static int recordSubject(const PamAblDbEnv *pamDb, const abl_args *args, abl_info *info, log_context *logContext, int isHost) {
     if (!pamDb || !args || !info)
         return 1;
 
@@ -535,7 +535,7 @@ static int recordSubject(const PamAbleDbEnv *pamDb, const abl_args *args, abl_in
     return err;
 }
 
-int record_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
+int record_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
     if (!dbEnv || !args || !info)
         return 1;
 

@@ -24,7 +24,7 @@
 
 #include <string.h>
 
-#define TEST_DIR "/tmp/pam-able_dbtest-dir"
+#define TEST_DIR "/tmp/pam-abl_dbtest-dir"
 
 static DbEnvironment *openTestEnvironment() {
     DbEnvironment *environment = NULL;

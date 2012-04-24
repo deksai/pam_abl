@@ -25,10 +25,10 @@ d. call make
       make
 
 The build process will make 3 targets:
-a. The library "pam-able.so"
-b. The commandline tool "pam-able"
-c. A test executable "pam-able_test". Really handy for testing it with different db versions
-Currently the targets are called pam-able (stands for pam-abl extended) because this version was developed separately from pam-abl but starting from the sources from pam-abl.
+a. The library "pam-abl.so"
+b. The commandline tool "pam-abl"
+c. A test executable "pam-abl_test". Really handy for testing it with different db versions
+Currently the targets are called pam-abl (stands for pam-abl extended) because this version was developed separately from pam-abl but starting from the sources from pam-abl.
 
 Building using different version of Berkeley db.
 See the build file "CMakeLists.txt" for more details.

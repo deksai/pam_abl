@@ -17,7 +17,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pam_able.h"
+#include "pam_abl.h"
 #include "config.h"
 
 #include <stdlib.h>
@@ -25,19 +25,19 @@
 #include <security/pam_modules.h>
 #include <security/pam_appl.h>
 
-#define MODULE_NAME "pam-able"
+#define MODULE_NAME "pam-abl"
 
-typedef struct able_context {
+typedef struct abl_context {
     abl_args     *args;
     abl_info     *attemptInfo;
-    PamAbleDbEnv *dbEnv;
+    PamAblDbEnv *dbEnv;
     log_context  *logContext;
-} able_context;
+} abl_context;
 
 static void cleanup(pam_handle_t *pamh, void *data, int err) {
     (void)(pamh);
     if (NULL != data) {
-        able_context *context = data;
+        abl_context *context = data;
         log_debug(context->logContext, "In cleanup, err is %08x", err);
 
         if (err && (err & PAM_DATA_REPLACE) == 0) {
@@ -45,7 +45,7 @@ static void cleanup(pam_handle_t *pamh, void *data, int err) {
             log_debug(context->logContext, "record returned %d", recordResult);
         }
         if (context->dbEnv)
-            destroyPamAbleDbEnvironment(context->dbEnv);
+            destroyPamAblDbEnvironment(context->dbEnv);
         if (context->attemptInfo)
             free(context->attemptInfo);
         if (context->args)
@@ -60,9 +60,9 @@ static void cleanup(pam_handle_t *pamh, void *data, int err) {
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
     (void)(flags);
     int err = PAM_BUF_ERR;
-    PamAbleDbEnv *dbEnv = NULL;
+    PamAblDbEnv *dbEnv = NULL;
     abl_info *info = malloc(sizeof(abl_info));
-    able_context *context = malloc(sizeof(able_context));
+    abl_context *context = malloc(sizeof(abl_context));
     abl_args *args = config_create();
     log_context *logContext = createLogContext();
     if (!info || ! context || !args || !logContext) {
@@ -70,13 +70,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         goto psa_fail;
     }
     memset(info, 0, sizeof(abl_info));
-    memset(context, 0, sizeof(able_context));
+    memset(context, 0, sizeof(abl_context));
 
     err = config_parse_args(argc, argv, args, logContext);
     if (err == 0) {
         /* We now keep the database open from the beginning to avoid the cost
          * of opening them repeatedly. */
-        dbEnv = openPamAbleDbEnvironment(args, logContext);
+        dbEnv = openPamAblDbEnvironment(args, logContext);
         if (!dbEnv) {
             log_error(logContext, "The database environment could not be opened");
             goto psa_fail;
@@ -110,7 +110,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             goto psa_fail;
         }
 
-        //BlockState check_attempt(const PamAbleDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
+        //BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
         BlockState bState = check_attempt(dbEnv, args, info, logContext);
         if (bState == BLOCKED) {
             log_info(logContext, "Blocking access from %s to service %s, user %s", info->host, info->service, info->user);
@@ -125,7 +125,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
 psa_fail:
     if (dbEnv)
-        destroyPamAbleDbEnvironment(dbEnv);
+        destroyPamAblDbEnvironment(dbEnv);
     if (info)
         free(info);
     if (context)

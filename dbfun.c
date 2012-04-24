@@ -36,7 +36,7 @@ int createEnvironment(log_context *context, const char *home, DbEnvironment **en
     	log_db_error(context, ret, "creating environment object");
         return ret;
     }
-    dbenv->set_errpfx(dbenv, "pam-able");
+    dbenv->set_errpfx(dbenv, "pam-abl");
     if ((ret = dbenv->open(dbenv, home, DB_CREATE | DB_INIT_TXN | DB_INIT_LOCK | DB_INIT_MPOOL | DB_RECOVER | DB_REGISTER, 0)) != 0) {
         log_db_error(context, ret, "opening the database environment");
         dbenv->close(dbenv, 0);
