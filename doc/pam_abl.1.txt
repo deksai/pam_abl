@@ -114,7 +114,7 @@ $ pam_abl -u
 
 AUTHORS
 -------
-Lode Mertens <lodemertens@hotmail.com>
+Lode Mertens <pam-abl@danta.be>
 
 Andy Armstrong <andy@hexten.net>
 

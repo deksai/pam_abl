@@ -182,7 +182,7 @@ pam_abl.conf(5), pam_abl(1)
 AUTHORS
 -------
 
-Lode Mertens <lodemertens@hotmail.com>
+Lode Mertens <pam-abl@danta.be>
 
 Andy Armstrong <andy@hexten.net>
 
