@@ -9,6 +9,9 @@ Welcome to pam-abl.
 1) Introduction
 pam_abl is a pam module designed to automatically block hosts which are attempting a brute force attack. Brute force attacks are an unsophisticated way to find authentication credentials. Basically, a computer is setup to try all kinds of user names and password combinations until one works. It may sound fairly far fetched, but it does actually work. Many system accounts have common user names. Passwords are also easily guessable in many situations. 
 
+The latest version is 0.5.0
+This version is a total rewrite of the previous versions. I guess +-400 lines are unchanged (mostly dealing with parsing the config file).
+The total rewrite results in a lot more stability and some extra features (Please see the manpages in the doc directory for more details).
 
 
 2) Building
@@ -28,11 +31,11 @@ The build process will make 3 targets:
 a. The library "pam-abl.so"
 b. The commandline tool "pam-abl"
 c. A test executable "pam-abl_test". Really handy for testing it with different db versions
-Currently the targets are called pam-abl (stands for pam-abl extended) because this version was developed separately from pam-abl but starting from the sources from pam-abl.
 
-Building using different version of Berkeley db.
-See the build file "CMakeLists.txt" for more details.
-
+!!!!!!!!!!
+!!! Building using different version of Berkeley db.
+!!! See the build file "CMakeLists.txt" for more details.
+!!!!!!!!!!
 
 
 3) Supported databases
