@@ -1,0 +1,37 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!--
+Design by Free CSS Templates
+http://www.freecsstemplates.org
+Released for free under a Creative Commons Attribution 2.5 License
+
+Name       : Republic  
+Description: A two-column, fixed-width design with dark color scheme.
+Version    : 1.0
+Released   : 20090910
+
+-->
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="Keywords" content="PAM,automatic blacklist, brute force attacks,intrusion detection" />
+<meta name="Description" content="Automatic blacklisting of brute force attacks through PAM" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<title>PAM blacklisting module</title>
+<link href="css/style.css" rel="stylesheet" type="text/css" media="screen" />
+</head>
+<body>
+<div id="wrapper">
+	<div id="header">
+		<div id="logo">
+			<h1><a href="#">PAM ABL</a></h1>
+			<p><br/> Automatic defense against brute force attacks.</p>
+		</div>
+	</div>
+	<!-- end #header -->
+	<div id="menu">
+		<?php include("./menu") ?>
+	</div>
+	<!-- end #menu -->
+	<div id="page">
+	<div id="page-bgtop">
+	<div id="page-bgbtm">
+		<div id="content">
