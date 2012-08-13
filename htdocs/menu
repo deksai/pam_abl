@@ -2,7 +2,6 @@
 $current = trim($_SERVER["SCRIPT_NAME"],'/');
 $links = array(
 	"index.php" => "Home",
-	"news.php"  => "News",
 	"http://sourceforge.net/projects/pam-abl/files/" => "Downloads",
 	"docs.php"   => "Docs",
 	"https://sourceforge.net/tracker/?limit=25&func=&group_id=148927&atid=773100&status=1" => "Bugs");
