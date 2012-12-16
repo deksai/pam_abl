@@ -88,8 +88,13 @@ int record_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *inf
 /*
   Following functions are only 'exported' for testing purposes
 */
+int prepare_string(const char *str, const abl_info *info, char *result);
 int parseIP(const char *ipStr, size_t length, int *netmask, u_int32_t *ip);
 int whitelistMatch(const char *subject, const char *whitelist, int isHost);
 int inSameSubnet(u_int32_t host, u_int32_t ip, int netmask);
+int ablExec(char *const arg[]);
+//the following function takes a pointer to a real exec function just for testing purpopes
+//that way we don't actually have to run an external command just to test this function
+int _runCommand(const char *origCommand, const abl_info *info, log_context *logContext, int (execFun)(char *const arg[]));
 
 #endif

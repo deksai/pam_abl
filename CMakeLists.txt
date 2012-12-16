@@ -26,6 +26,7 @@ set(PAM_ABL_TEST_SRC
 	test_db.c
 	test_rule.c
 	test_types.c
+	test_config.c
 )
 
 find_package(BerkeleyDB REQUIRED)

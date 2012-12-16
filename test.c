@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "dbfun.h"
 
@@ -56,11 +57,22 @@ void makeDir(const char *dirname) {
     mkdir(dirname, S_IRWXU);
 }
 
-int main() {
+int main(int argc, const char *argv[]) {
+    //for the test running a command we need to run an external command. Because we can't rely on a particular
+    //executable being present, we provide our own external command
+    if (argc >= 3) {
+        if (strcmp(argv[1], "-e") == 0) {
+            int exitCode = atoi(argv[2]);
+            exit(exitCode);
+        }
+    }
     printf("Using db version \"%s\" %d.%d.%d\n", DB_VERSION_STRING, DB_VERSION_MAJOR, DB_VERSION_MINOR, DB_VERSION_PATCH);
     runTypeTests();
     runDatabaseTests();
     runtRuleTests();
     testAbl();
+    testExternalCommand(argv[0]);
+    testRunCommand();
+    testConfig();
     return 0;
 }

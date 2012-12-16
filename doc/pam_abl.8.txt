@@ -96,18 +96,22 @@ You can specify single IP addresses here or use subnets.
 For example 1.1.1.1 or 1.1.1.1/24
 
 |host_blk_cmd|Host block command |
+Deprecated for security reasons. Please use host_block_cmd
+
+|host_clr_cmd|Host clear command |
+Deprecated for security reasons. Please use host_clear_cmd
+
+|host_block_cmd|Host block command |
 Command that should be run when a host is checked, and is currently blocked.
 Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used.  If substitution is called
-for, but there is no iformation for that field, the command will not
-run.
+host and service.  Not all need to be used. Please see the manpage of
+pam_abl.conf for the correct syntax.
 
-|host_clr_cmd|Host block command |
+|host_clear_cmd|Host clear command |
 Command that should be run when a host is checked, and is currently clear.
 Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used.  If substitution is called
-for, but there is no iformation for that field, the command will not
-run.
+host and service.  Not all need to be used. Please see the manpage of
+pam_abl.conf for the correct syntax.
 
 |user_db|Path to user database file.|
 Path to the Berkeley DB which is used to log the user responsible for failed
@@ -125,19 +129,21 @@ failed users will be blackisted.
 ;-seperated list of users whose attempts do not need to be recorded.
 This does not prevent the machine they are using from being blocked.
 
-|user_blk_cmd|Host block command |
+|user_blk_cmd|User block command |
+Deprecated for security reasons. Please use user_block_cmd
+
+|user_clr_cmd|User clear command |
+Deprecated for security reasons. Please use clear_block_cmd
+
+|user_blk_cmd|User block command |
 Command that should be run when a user is checked, and is currently blocked.
 Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used.  If substitution is called
-for, but there is no iformation for that field, the command will not
-run.
+host and service.  Not all need to be used.
 
-|user_clr_cmd|Host block command |
+|user_clr_cmd|User block command |
 Command that should be run when a user is checked, and is currently clear.
 Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used.  If substitution is called
-for, but there is no iformation for that field, the command will not
-run.
+host and service.  Not all need to be used.
 
 |=========================================================================
 

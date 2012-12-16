@@ -31,6 +31,9 @@ MAINTENANCE
 *-h, --help*::
        See this message.
 
+*-d, --debugcommand*::
+       Print the block/clear commands split in arguments.
+
 *-p, --purge*::
        Purge databases according to purge rules in config.
 

@@ -34,6 +34,7 @@ static void testPamAblDbEnv() {
     args.host_db = "/tmpt/blaat/non-existing/hosts.db";
     args.user_db = "/tmpt/blaat/non-existing/users.db";
 
+    printf("   This message should be followed by 2 errors (No such file or directory ...).\n");
     PamAblDbEnv *dummy = openPamAblDbEnvironment(&args, NULL);
     if (dummy) {
         printf("   The db could be opened on a non existing environment.\n");
@@ -134,9 +135,6 @@ static void checkAttempt(const char *user, const char *userRule, BlockState newU
     memset(&args, 0, sizeof(abl_args));
     args.host_rule = hostRule;
     args.user_rule = userRule;
-    //TODO, check if the commands have been run
-//    const char      *host_blk_cmd;
-//    const char      *host_clr_cmd;
 
     abl_info info;
     memset(&info, 0, sizeof(abl_info));
@@ -752,6 +750,59 @@ static void testWhitelistMatch() {
     }
 }
 
+static void testSubstitute(const char *str, const char *user, const char *host, const char *service, const char *result) {
+    abl_info info;
+    info.user = user;
+    info.host = host;
+    info.service = service;
+
+    int resultSize = prepare_string(str, &info, NULL);
+    if (resultSize != (int)(strlen(result)+1)) {
+        printf("   substitute length was incorrect for \"%s\"\n", str);
+        return;
+    }
+    char *res = malloc(resultSize * sizeof(char));
+    int i = 0;
+    for (; i < resultSize; ++i)
+        res[i] = 'a';
+    resultSize = prepare_string(str, &info, res);
+    if (resultSize != (int)(strlen(result)+1)) {
+        printf("   actual substitute length was incorrect for \"%s\"\n", str);
+    } else {
+        if (strcmp(res, result) != 0)
+            printf("   substitute was incorrect \"%s\" != \"%s\"\n", res, str);
+    }
+    free(res);
+}
+
+static void testSubstituteNormal() {
+    testSubstitute("command %u", "user", "host", "service", "command user");
+    testSubstitute("command %h", "user", "host", "service", "command host");
+    testSubstitute("command %s", "user", "host", "service", "command service");
+    testSubstitute("command %u %h %s", "user", "host", "service", "command user host service");
+    testSubstitute("command %u%h%s", "user", "host", "service", "command userhostservice");
+    testSubstitute("command %u %h %u %s %h %s", "user", "host", "service", "command user host user service host service");
+}
+
+static void testNoSubstitute() {
+    testSubstitute("command ", "user", "host", "service", "command ");
+    testSubstitute("", "user", "host", "service", "");
+    testSubstitute("", "user", "host", "service", "");
+    testSubstitute("", "", "", "", "");
+}
+
+static void testEmptySubstitute() {
+    testSubstitute("command %u %h %s", "", "host", "service", "command  host service");
+    testSubstitute("command %u %h %s", "user", "", "service", "command user  service");
+    testSubstitute("command %u %h %s", "user", "host", "", "command user host ");
+    testSubstitute("command %u %h %s", "", "", "", "command   ");
+}
+
+static void testSubstituteWithPercent() {
+    testSubstitute("%%command %%%u %%%h %%%s %%", "user", "host", "service", "%command %user %host %service %");
+    testSubstitute("%%command %%%u %%%h %%%s %%", "%user%", "%host%", "%service%", "%command %%user% %%host% %%service% %");
+}
+
 void testAbl() {
     printf("Abl test start.\n");
     printf(" Starting testPamAblDbEnv.\n");
@@ -780,5 +831,114 @@ void testAbl() {
     testInSameSubnet();
     printf(" Starting testWhitelistMatch.\n");
     testWhitelistMatch();
+    printf(" Starting testSubstituteNormal.\n");
+    testSubstituteNormal();
+    printf(" Starting testNoSubstitute.\n");
+    testNoSubstitute();
+    printf(" Starting testEmptySubstitute.\n");
+    testEmptySubstitute();
+    printf(" Starting testSubstituteWithPercent.\n");
+    testSubstituteWithPercent();
     printf("Abl test end.\n");
+}
+
+static void testCommand(const char *cmd, int exitCode) {
+    char** cmdArr = malloc(4*sizeof(char*));
+    char buff[10];
+    snprintf(buff, 10, "%d", exitCode);
+    cmdArr[0] = (char*)cmd;
+    cmdArr[1] = "-e";
+    cmdArr[2] = &buff[0];
+    cmdArr[3] = NULL;
+    int result = ablExec(&cmdArr[0]);
+    if (result != exitCode) {
+        printf("   ablExec exit code: \"%d\" != \"%d\"\n", result, exitCode);
+    }
+}
+
+void testExternalCommand(const char *cmd) {
+    printf("testExternalCommand start.\n");
+    printf(" Basic exitcode tests.\n");
+    int i = 0;
+    for (; i < 10; ++i ) {
+        testCommand(cmd, i);
+    }
+    printf(" Non existing command test.\n");
+    testCommand("command_that_doenst_exist", 255);
+    printf(" Invalid input test.\n");
+    testCommand(0, -1);
+    testCommand("", -1);
+    printf("testExternalCommand end.\n");
+}
+
+static const char **s_expected_arg = NULL;
+static int s_execFun_called = 0;
+static int s_execFun_exitCode = 0;
+
+static int execFun(char *const arg[]) {
+    s_execFun_called = 1;
+    int i = 0;
+    while (s_expected_arg[i]) {
+        if (arg[i]) {
+            if (strcmp(s_expected_arg[i], arg[i]) != 0) {
+                printf("   execFun: argument mismatch \"%s\" != \"%s\"\n", arg[i], s_expected_arg[i]);
+                return s_execFun_exitCode;
+            }
+        } else {
+            printf("   execFun: missing argument \"%s\"\n", s_expected_arg[i]);
+            return s_execFun_exitCode;
+        }
+        ++i;
+    }
+    if (arg[i] != NULL) {
+        printf("   we got more parameters than expected: \"%s\"", arg[i]);
+    }
+    return s_execFun_exitCode;
+}
+
+//int _runCommand(const char *origCommand, const abl_info *info, log_context *logContext, int (execFun)(char *const arg[]))
+static void testRunCommandHelper(const char *origCommand, int isOk, const abl_info *info, const char *arg1, const char *arg2, const char *arg3, const char *arg4) {
+    const char *expected[5];
+    expected[0] = arg1;
+    expected[1] = arg2;
+    expected[2] = arg3;
+    expected[3] = arg4;
+    expected[4] = NULL;
+    s_expected_arg = (const char **)(&expected[0]);
+    int i = 0;
+    for (i = 0; i < 2; ++i) {
+        s_execFun_called = 0;
+        s_execFun_exitCode = i;
+        int returnCode = _runCommand(origCommand, info, NULL, execFun);
+        if (s_execFun_called != isOk) {
+            if (isOk)
+                printf("   Expected the command \"%s\" to be called.", arg1);
+            else
+                printf("   Did not expect the command \"%s\" to be called.", arg1);
+        }
+        if (returnCode != s_execFun_exitCode) {
+            printf("   Expected exit code \"%d\" instead of \"%d\".", s_execFun_exitCode, returnCode);
+        }
+    }
+}
+
+
+void testRunCommand() {
+    printf("testRunCommand start.\n");
+    abl_info info;
+    info.host = "127.0.0.1";
+    info.user = "mooh";
+    info.service = "sharing";
+    printf(" basic command test.\n");
+    testRunCommandHelper("[command]", 1, &info, "command", NULL, NULL, NULL);
+    printf(" command with substitution test.\n");
+    testRunCommandHelper("[command %u]", 1, &info, "command mooh", NULL, NULL, NULL);
+    printf(" command with some shell code test.\n");
+    testRunCommandHelper("[command | > %u %h %s]", 1, &info, "command | > mooh 127.0.0.1 sharing", NULL, NULL, NULL);
+
+    testRunCommandHelper("[command] [arg1] [%u] [%h]", 1, &info, "command", "arg1", "mooh", "127.0.0.1");
+
+    info.user = "[lol]";
+    testRunCommandHelper("[command %u] [%u]", 1, &info, "command [lol]", "[lol]", NULL, NULL);
+    printf("testRunCommand end.\n");
 }
