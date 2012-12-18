@@ -23,6 +23,8 @@
 #include <string.h>
 
 #define DBPERM 0600
+//do a checkpoint every 8MB of log
+#define CHECKPOINTSIZE (8000)
 
 //let's allocate a 'large' buffer
 char largeBuffer[1024*50];
@@ -46,6 +48,17 @@ int createEnvironment(log_context *context, const char *home, DbEnvironment **en
         /* Do deadlock detection internally. */
         if ((ret = dbenv->set_lk_detect(dbenv, DB_LOCK_DEFAULT)) != 0) {
             log_db_error(context, ret, "setting lock detection.");
+        }
+#if ((DB_VERSION_MAJOR >= 5)||(DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 7))
+        ret = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
+#else
+        ret = dbenv->set_flags(dbenv, DB_LOG_AUTOREMOVE, 1);
+#endif
+        if (ret != 0) {
+            log_db_error(context, ret, "setting automatic log file removal.");
+        }
+        if ((ret = dbenv->txn_checkpoint(dbenv, CHECKPOINTSIZE, 0, 0)) != 0) {
+            log_db_error(context, ret, "setting the automatic checkpoint option.");
         }
     }
 
