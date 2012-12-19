@@ -57,16 +57,17 @@ add_definitions(-W -Wall -Wshadow -Winit-self -Wredundant-decls -Wcast-align -Wf
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 add_executable(pam-abl_bin ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TOOLS_SRC})
-set_target_properties(pam-abl_bin PROPERTIES OUTPUT_NAME pam-abl)
+set_target_properties(pam-abl_bin PROPERTIES OUTPUT_NAME pam_abl)
 set_target_properties(pam-abl_bin PROPERTIES COMPILE_DEFINITIONS "TOOLS")
 target_link_libraries(pam-abl_bin ${DB_LIBRARY} )
 
 add_executable(pam-abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
+set_target_properties(pam-abl_test PROPERTIES OUTPUT_NAME pam_abl_test)
 set_target_properties(pam-abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
 target_link_libraries(pam-abl_test ${DB_LIBRARY} )
 
 add_library(pam-abl_lib SHARED ${PAM_ABL_COMMON_SRC} ${PAM_ABL_LIB_SRC})
-set_target_properties(pam-abl_lib PROPERTIES OUTPUT_NAME pam-abl)
+set_target_properties(pam-abl_lib PROPERTIES OUTPUT_NAME pam_abl)
 target_link_libraries(pam-abl_lib ${DB_LIBRARY} ${PAM_LIBRARY})
 
 INSTALL(TARGETS pam-abl_bin
