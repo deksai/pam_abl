@@ -21,15 +21,11 @@
 #define PAM_ABL_H
 
 #include "config.h"
-#include "dbfun.h"
+#include "typefun.h"
+#include <sys/types.h>
 
-typedef struct PamAblDbEnv {
-    DbEnvironment *m_environment;
-    Database      *m_userDb;
-    Database      *m_hostDb;
-} PamAblDbEnv;
-
-
+typedef struct abl_db abl_db;
+abl_db *(*db_open)(const abl_args *args);
 typedef struct {
     BlockReason blockReason;
     const char *user;
@@ -37,20 +33,6 @@ typedef struct {
     const char *service;
 } abl_info;
 
-/*
-  Given a full configuration open the required environment and databases
-  \param args The config with all the db params
-  \param logContext The loggin context to use when reporting errors/warnings/...
-  \return a valid environment on success, otherwise a nullptr
-  \note f something goes wrong, error messages are written to the logContext
-*/
-PamAblDbEnv *openPamAblDbEnvironment(abl_args *args, log_context *logContext);
-
-/*
-  Close a full environment. Make sure no transaction is open
-  \note Do not use the env pointer anymore after calling this function
-*/
-void destroyPamAblDbEnvironment(PamAblDbEnv *env);
 
 /*
   Call the desired scripts if possible
@@ -60,8 +42,8 @@ void destroyPamAblDbEnvironment(PamAblDbEnv *env);
   \param logContext The context that will be used when reporting errors/warnings/...
   \return zero on success, otherwise non zero
 */
-int runHostCommand(BlockState bState, const abl_args *args, abl_info *info, log_context *logContext);
-int runUserCommand(BlockState bState, const abl_args *args, abl_info *info, log_context *logContext);
+int runHostCommand(BlockState bState, const abl_args *args, abl_info *info);
+int runUserCommand(BlockState bState, const abl_args *args, abl_info *info);
 
 /*
     Returns the current state for the given attempt.
@@ -73,7 +55,7 @@ int runUserCommand(BlockState bState, const abl_args *args, abl_info *info, log_
     If something goes wrong while checking, CLEAR is returned
     and diagnostic messages are written using the given logContext.
 */
-BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
+BlockState check_attempt(const abl_db *db, const abl_args *args, abl_info *info);
 
 /*
     Record an authentication attempt.
@@ -82,8 +64,7 @@ BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_inf
         - add an entry for the given host and user with as reason info->blockReason
     If something went wrong, a non zero value is returned and a diagnostic message is logged using the logContext
 */
-int record_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext);
-
+int record_attempt(const abl_db *db, const abl_args *args, abl_info *info);
 
 /*
   Following functions are only 'exported' for testing purposes

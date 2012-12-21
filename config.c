@@ -65,6 +65,7 @@ static void config_clear(abl_args *args) {
     /* Init the args structure
      */
     args->db_home         = NULL;
+    args->db_module       = "/lib/abl/db4.so";
     args->host_db         = NULL;
     args->host_rule       = NULL;
     args->host_purge      = HOST_PURGE;
@@ -83,21 +84,22 @@ static void config_clear(abl_args *args) {
     args->strs            = NULL;
 }
 
-abl_args *config_create() {
+void config_create() {
     abl_args *retValue = malloc(sizeof(abl_args));
     if (retValue)
         config_clear(retValue);
-    return retValue;
 }
 
-static int parse_arg(const char *arg, abl_args *args, log_context *logContext) {
+static int parse_arg(const char *arg, abl_args *args) {
     const char *v;
     int err;
 
     if (0 == strcmp(arg, "debug")) {
-        logContext->debug = 1;
+        args->debug = 1;
     } else if (v = is_arg("db_home", arg), NULL != v) {
         args->db_home = v;
+    } else if (v = is_arg("db_module", arg), NULL != v) {
+        args->db_module = v;
     } else if (v = is_arg("limits", arg), NULL != v) {
         long upper = 0;
         long lower = 0;
@@ -116,7 +118,7 @@ static int parse_arg(const char *arg, abl_args *args, log_context *logContext) {
             }
         }
         if (error) {
-            log_warning(logContext, "limits needs to have the following syntax: <lower>-<upper> with upper > lower.");
+            log_warning("limits needs to have the following syntax: <lower>-<upper> with upper > lower.");
             args->upperlimit = 0;
             args->lowerlimit = 0;
         } else {
@@ -129,7 +131,7 @@ static int parse_arg(const char *arg, abl_args *args, log_context *logContext) {
         args->host_rule = v;
     } else if (v = is_arg("host_purge", arg), NULL != v) {
         if (err = rule_parse_time(v, &args->host_purge, HOURSECS), 0 != err) {
-            log_error(logContext, "Illegal host_purge value: %s", v);
+            log_error("Illegal host_purge value: %s", v);
         }
     } else if (v = is_arg("host_blk_cmd", arg), NULL != v) {
         args->host_blk_cmd = v;
@@ -143,7 +145,7 @@ static int parse_arg(const char *arg, abl_args *args, log_context *logContext) {
         args->user_rule = v;
     } else if (v = is_arg("user_purge", arg), NULL != v) {
         if (err = rule_parse_time(v, &args->user_purge, HOURSECS), 0 != err) {
-            log_error(logContext, "Illegal user_purge value: %s", v);
+            log_error("Illegal user_purge value: %s", v);
         }
     } else if (v = is_arg("user_blk_cmd", arg), NULL != v) {
         args->user_blk_cmd = v;
@@ -152,9 +154,9 @@ static int parse_arg(const char *arg, abl_args *args, log_context *logContext) {
     } else if (v = is_arg("user_whitelist", arg), NULL != v) {
         args->user_whitelist = v;
     } else if (v = is_arg("config", arg), NULL != v) {
-        config_parse_file(v, args, logContext);
+        config_parse_file(v, args);
     } else {
-        log_error(logContext, "Illegal option: %s", arg);
+        log_error("Illegal option: %s", arg);
         return EINVAL;
     }
 
@@ -172,7 +174,7 @@ struct reader {
     int     lc;
 };
 
-static int ensure(log_context *logContext, struct linebuf *b, int minfree) {
+static int ensure(struct linebuf *b, int minfree) {
     if (b->size - b->len < minfree) {
         char *nb;
         int ns;
@@ -182,7 +184,7 @@ static int ensure(log_context *logContext, struct linebuf *b, int minfree) {
         ns = b->len + minfree;
         nb = realloc(b->buf, ns);
         if (NULL == nb) {
-            log_sys_error(logContext, ENOMEM, "parsing config file");
+            log_sys_error(ENOMEM, "parsing config file");
             return ENOMEM;
         }
         b->size = ns;
@@ -208,7 +210,7 @@ static int readc(struct reader *r) {
     }
 }
 
-static int read_line(log_context *logContext, struct linebuf *b, struct reader *r) {
+static int read_line(struct linebuf *b, struct reader *r) {
     int c, err;
 
     c = readc(r);
@@ -218,7 +220,7 @@ static int read_line(log_context *logContext, struct linebuf *b, struct reader *
             c = readc(r);
         }
         while (c != '\n' && c != EOF && c != '#') {
-            if (err = ensure(logContext, b, 1), 0 != err) {
+            if (err = ensure(b, 1), 0 != err) {
                 return err;
             }
             b->buf[b->len++] = c;
@@ -234,7 +236,7 @@ static int read_line(log_context *logContext, struct linebuf *b, struct reader *
         b->len--;
     }
 
-    ensure(logContext, b, 1);
+    ensure(b, 1);
     b->buf[b->len++] = '\0';
 
     return 0;
@@ -250,7 +252,7 @@ static const char *dups(abl_args *args, const char *s) {
 }
 
 /* Parse the contents of a config file */
-int config_parse_file(const char *name, abl_args *args, log_context *logContext) {
+int config_parse_file(const char *name, abl_args *args) {
     struct linebuf b;
     struct reader  r;
     int err = 0;
@@ -267,7 +269,7 @@ int config_parse_file(const char *name, abl_args *args, log_context *logContext)
 
     r.lc = getc(r.f);
     while (r.lc != EOF) {
-        if (err = read_line(logContext, &b, &r), 0 != err) {
+        if (err = read_line(&b, &r), 0 != err) {
             goto done;
         }
         if (b.len > 1) {
@@ -275,8 +277,8 @@ int config_parse_file(const char *name, abl_args *args, log_context *logContext)
                 err = ENOMEM;
                 goto done;
             }
-            log_debug(logContext, "%s: %s", name, l);
-            if (err = parse_arg(l, args, logContext), 0 != err) {
+            log_debug(args, "%s: %s", name, l);
+            if (err = parse_arg(l, args), 0 != err) {
                 goto done;
             }
         }
@@ -284,18 +286,18 @@ int config_parse_file(const char *name, abl_args *args, log_context *logContext)
 
 done:
     if (0 != err) {
-        log_sys_error(logContext, err, "reading config file");
+        log_sys_error(err, "reading config file");
     }
 
     if (err == 0) {
         if (!args->db_home) {
             err = ENOENT;
-            log_sys_error(logContext, err, "reading config file: No db_home dir specified");
+            log_sys_error(err, "reading config file: No db_home dir specified");
         } else {
             struct stat sb;
             if (!(stat(args->db_home, &sb) == 0 && S_ISDIR(sb.st_mode))) {
                 err = ENOTDIR;
-                log_sys_error(logContext, err, "parsing the value of db_home");
+                log_sys_error(err, "parsing the value of db_home");
             }
         }
     }
@@ -308,45 +310,45 @@ done:
     return err;
 }
 
-void dump_args(const abl_args *args, log_context *logContext) {
+void dump_args(const abl_args *args) {
     abl_string *s;
 
-    log_debug(logContext, "debug           = %d",  logContext->debug);
+    log_debug(args, "debug           = %d",  args->debug);
 
-    log_debug(logContext, "db_home         = %s",  args->db_home);
-    log_debug(logContext, "host_db         = %s",  args->host_db);
-    log_debug(logContext, "host_rule       = %s",  args->host_rule);
-    log_debug(logContext, "host_purge      = %ld", args->host_purge);
-    log_debug(logContext, "host_blk_cmd    = %s",  args->host_blk_cmd);
+    log_debug(args, "db_home         = %s",  args->db_home);
+    log_debug(args, "host_db         = %s",  args->host_db);
+    log_debug(args, "host_rule       = %s",  args->host_rule);
+    log_debug(args, "host_purge      = %ld", args->host_purge);
+    log_debug(args, "host_blk_cmd    = %s",  args->host_blk_cmd);
 
-    log_debug(logContext, "user_db         = %s",  args->user_db);
-    log_debug(logContext, "user_rule       = %s",  args->user_rule);
-    log_debug(logContext, "user_purge      = %ld", args->user_purge);
-    log_debug(logContext, "user_blk_cmd    = %s",  args->user_blk_cmd);
-    log_debug(logContext, "lower limit     = %ld", args->lowerlimit);
-    log_debug(logContext, "upper limit     = %ld", args->upperlimit);
+    log_debug(args, "user_db         = %s",  args->user_db);
+    log_debug(args, "user_rule       = %s",  args->user_rule);
+    log_debug(args, "user_purge      = %ld", args->user_purge);
+    log_debug(args, "user_blk_cmd    = %s",  args->user_blk_cmd);
+    log_debug(args, "lower limit     = %ld", args->lowerlimit);
+    log_debug(args, "upper limit     = %ld", args->upperlimit);
     for (s = args->strs; NULL != s; s = s->link) {
-        log_debug(logContext, "str[%p] = %s", s, (char *) (s + 1));
+        log_debug(args, "str[%p] = %s", s, (char *) (s + 1));
     }
 }
 
 /* Parse our argments and populate an abl_args structure accordingly.
  */
-int config_parse_args(int argc, const char **argv, abl_args *args, log_context *logContext) {
+int config_parse_args(int argc, const char **argv, abl_args *args) {
     int argn;
     int err;
 
     config_clear(args);
 
     for (argn = 0; argn < argc; argn++) {
-        err = parse_arg(argv[argn], args, logContext);
+        err = parse_arg(argv[argn], args);
         if (err) {
             return err;
         }
     }
 
-    if (logContext->debug)
-        dump_args(args, logContext);
+    if (args->debug)
+        dump_args(args);
 
     return 0;
 }

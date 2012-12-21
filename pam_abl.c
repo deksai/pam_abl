@@ -29,7 +29,7 @@
 #define DB_NAME "state"
 #define COMMAND_SIZE 1024
 
-static int prepare_command(log_context *logContext, const char *cmd, const abl_info *info, char **string) {
+static int prepare_command(const char *cmd, const abl_info *info, char **string) {
     int i;
     int cmd_sz = strlen(cmd);
     int strstore_sz = 0;
@@ -45,7 +45,7 @@ static int prepare_command(log_context *logContext, const char *cmd, const abl_i
 
     strstore = calloc(COMMAND_SIZE,sizeof(char));
     if (strstore == NULL) {
-        log_error(logContext, "Could not allocate memory for running command");
+        log_error( "Could not allocate memory for running command");
         return -1;
     }
 
@@ -56,11 +56,11 @@ static int prepare_command(log_context *logContext, const char *cmd, const abl_i
             switch(subst) {
                 case 'u':
                     if(strstore_sz + user_sz >= COMMAND_SIZE) {
-                        log_warning(logContext, "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+user_sz,COMMAND_SIZE);
+                        log_warning( "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+user_sz,COMMAND_SIZE);
                         return(1);
                     }
                     else if (!info->user) {
-                        log_warning(logContext, "No user to substitute: %s.",cmd);
+                        log_warning( "No user to substitute: %s.",cmd);
                         return(1);
                     }
                     else {
@@ -70,11 +70,11 @@ static int prepare_command(log_context *logContext, const char *cmd, const abl_i
                     break;
                 case 'h':
                     if(strstore_sz + host_sz >= COMMAND_SIZE) {
-                        log_warning(logContext, "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+host_sz,COMMAND_SIZE);
+                        log_warning( "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+host_sz,COMMAND_SIZE);
                         return(1);
                     }
                     else if (!info->host) {
-                        log_warning(logContext, "No host to substitute: %s.",cmd);
+                        log_warning( "No host to substitute: %s.",cmd);
                         return(1);
                     }
                     else {
@@ -84,11 +84,11 @@ static int prepare_command(log_context *logContext, const char *cmd, const abl_i
                     break;
                 case 's':
                     if(strstore_sz + service_sz >= COMMAND_SIZE) {
-                        log_warning(logContext, "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+service_sz,COMMAND_SIZE);
+                        log_warning( "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+service_sz,COMMAND_SIZE);
                         return(1);
                     }
                     else if (!info->service) {
-                        log_warning(logContext, "No service to substitute: %s.",cmd);
+                        log_warning( "No service to substitute: %s.",cmd);
                         return(1);
                     }
                     else {
@@ -107,154 +107,80 @@ static int prepare_command(log_context *logContext, const char *cmd, const abl_i
     return 0;
 }
 
-static int runCommand(const char *origCommand, const abl_info *info, log_context *logContext) {
+static int runCommand(const char *origCommand, const abl_info *info) {
     if (!origCommand || ! *origCommand)
         return 0;
     int  err = 0;
     char *command = NULL;
 
-    err = prepare_command(logContext , origCommand, info, &command);
+    err = prepare_command( origCommand, info, &command);
     if(err != 0) {
-        log_warning(logContext, "Failed to run command.");
+        log_warning( "Failed to run command.");
     } else if (command) {
-        log_debug(logContext, "running command %s",command);
+        log_debug(args, "running command %s",command);
         err = system(command);
         if (err == -1)
-            log_warning(logContext, "Failed to run command: %s",command);
+            log_warning( "Failed to run command: %s",command);
         free(command);
     } else if (!command)
-        log_debug(logContext, "No command to run for this situation.");
+        log_debug(args, "No command to run for this situation.");
     return err;
 }
 
-int runHostCommand(BlockState bState, const abl_args *args, abl_info *info, log_context *logContext) {
+int runHostCommand(BlockState bState, const abl_args *args, abl_info *info) {
     const char *command = NULL;
     if (bState == BLOCKED)
         command = args->host_blk_cmd;
     else if (bState == CLEAR)
         command = args->host_clr_cmd;
-    return runCommand(command, info, logContext);
+    return runCommand(command, info);
 }
 
-int runUserCommand(BlockState bState, const abl_args *args, abl_info *info, log_context *logContext) {
+int runUserCommand(BlockState bState, const abl_args *args, abl_info *info) {
     const char *command = NULL;
     if (bState == BLOCKED)
         command = args->user_blk_cmd;
     else if (bState == CLEAR)
         command = args->user_clr_cmd;
-    return runCommand(command, info, logContext);
+    return runCommand(command, info);
 }
 
-PamAblDbEnv *openPamAblDbEnvironment(abl_args *args, log_context *logContext) {
-    if (!args || !args->db_home || !*args->db_home)
-        return NULL;
 
-    DbEnvironment *environment = NULL;
-    Database *hostDb = NULL;
-    Database *userDb = NULL;
-
-    int err = createEnvironment(logContext, args->db_home, &environment);
-    if (err) {
-        log_db_error(logContext, err, "Creating database environment.");
-        return NULL;
-    }
-
-    if (args->host_db && *args->host_db) {
-        err = openDatabase(environment, args->host_db, DB_NAME, &hostDb);
-        if (err) {
-            log_db_error(logContext, err, "Creating host database.");
-            goto open_fail;
-        }
-    }
-
-    if (args->user_db && *args->user_db) {
-        err = openDatabase(environment, args->user_db, DB_NAME, &userDb);
-        if (err) {
-            log_db_error(logContext, err, "Creating user database.");
-            goto open_fail;
-        }
-    }
-
-    PamAblDbEnv *retValue = malloc(sizeof(PamAblDbEnv));
-    if (!retValue) {
-        log_error(logContext, "Memory allocation failed while opening the databases.");
-        goto open_fail;
-    }
-    memset(retValue, 0, sizeof(PamAblDbEnv));
-    retValue->m_environment = environment;
-    retValue->m_hostDb = hostDb;
-    retValue->m_userDb = userDb;
-    return retValue;
-
-open_fail:
-    if (hostDb)
-        closeDatabase(hostDb);
-    if (userDb)
-        closeDatabase(userDb);
-    if (environment)
-        destroyEnvironment(environment);
-    return NULL;
-}
-
-void destroyPamAblDbEnvironment(PamAblDbEnv *env) {
-    if (!env)
-        return;
-    if (env->m_hostDb)
-        closeDatabase(env->m_hostDb);
-    if (env->m_userDb)
-        closeDatabase(env->m_userDb);
-    if (env->m_environment)
-        destroyEnvironment(env->m_environment);
-    free(env);
-}
-
-static int update_status(Database *db, const char *subject, const char *service, const char *rule, time_t tm,
-                 log_context *logContext, BlockState *updatedState, int *stateChanged) {
-    //assume the state will not change
-    *stateChanged = 0;
-    DbEnvironment *dbEnv = db->m_environment;
+static int update_status(const abl_db *db, const char *subject, const char *service, const char *rule, time_t tm,
+                 BlockState *updatedState, int *stateChanged) {
+    int err = 0;
     AuthState *subjectState = NULL;
-    //all database actions need to be wrapped in a transaction
-    int err = startTransaction(dbEnv);
-    if (err) {
-        log_db_error(logContext, err, "starting transaction to update_status.");
-        return err;
-    }
-    err = getUserOrHostInfo(db, subject, &subjectState);
-    if (err)
-        log_db_error(logContext, err, "retrieving information failed.");
+
+    *stateChanged = 0; //assume the state will not change
+
+    err = db->get(db, subject, &subjectState);
+    
     //only update if we have a subjectState (It is already in the database and no error)
     if (subjectState) {
-        *updatedState = rule_test(logContext, rule, subject, service, subjectState, tm);
+        *updatedState = rule_test( rule, subject, service, subjectState, tm);
         //is the state changed
         if (*updatedState != getState(subjectState)) {
             //update the BlockState in the subjectState
             if (setState(subjectState, *updatedState)) {
-                log_error(logContext, "The state could not be updated.");
+                log_error( "The state could not be updated.");
             } else {
                 //save the subjectState
-                err = saveInfo(db, subject, subjectState);
-                if (err) {
-                    log_db_error(logContext, err, "saving the changed info.");
-                } else {
+                err = db->put(db, subject, subjectState);
+                if ( !err) {
                     *stateChanged = 1;
                 }
             }
         }
         destroyAuthState(subjectState);
     }
-    if (err)
-        abortTransaction(dbEnv);
-    else
-        commitTransaction(dbEnv);
     return err;
 }
 
-BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
+BlockState check_attempt(const abl_db *db, const abl_args *args, abl_info *info) {
     if (info)
         info->blockReason = AUTH_FAILED;
 
-    if (!dbEnv || !args || !info)
+    if (!db || !args || !info)
         return CLEAR;
     time_t tm = time(NULL);
     const char *user = info->user;
@@ -265,13 +191,13 @@ BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_inf
 
     //fist check the host
     //do we need to update the host information?
-    if (host && *host && dbEnv->m_hostDb && dbEnv->m_hostDb->m_environment && args->host_rule) {
+    if (host && args->host_rule) {
         int hostStateChanged = 0;
-        int err = update_status(dbEnv->m_hostDb, host, service, args->host_rule, tm,
-             logContext, &updatedHostState, &hostStateChanged);
+        int err = update_status(db, host, service, args->host_rule, tm,
+              &updatedHostState, &hostStateChanged);
         if (!err) {
             if (hostStateChanged)
-                runHostCommand(updatedHostState, args, info, logContext);
+                runHostCommand(updatedHostState, args, info);
         } else {
             //if something went wrong, we can't trust the value returned, so by default, do not block
             updatedHostState = CLEAR;
@@ -279,13 +205,13 @@ BlockState check_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_inf
     }
 
     //now check the user
-    if (user && *user && dbEnv->m_userDb && dbEnv->m_userDb->m_environment && args->user_rule) {
+    if (user && *user && args->user_rule) {
         int userStateChanged = 0;
-        int err = update_status(dbEnv->m_userDb, user, service, args->user_rule, tm,
-             logContext, &updatedUserState, &userStateChanged);
+        int err = update_status(db, user, service, args->user_rule, tm,
+              &updatedUserState, &userStateChanged);
         if (!err) {
             if (userStateChanged)
-                runUserCommand(updatedUserState, args, info, logContext);
+                runUserCommand(updatedUserState, args, info);
         } else {
             //if something went wrong, do not trust the returned value
             //and by default do not block
@@ -467,30 +393,28 @@ int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
     return 0;
 }
 
-static int recordSubject(const PamAblDbEnv *pamDb, const abl_args *args, abl_info *info, log_context *logContext, int isHost) {
-    if (!pamDb || !args || !info)
+static int recordSubject(const abl_db *db, const abl_args *args, abl_info *info, int isHost) {
+    if (!db || !args || !info)
         return 1;
 
-    DbEnvironment *dbEnv = pamDb->m_environment;
-    Database *db = pamDb->m_userDb;
-    const char *subject = info->user;
-    const char *data = info->host;
-    const char *service = info->service;
-    long purgeTimeout = args->user_purge;
+    int         err       = 0;
+    const char *subject   = info->user;
+    const char *data      = info->host;
+    const char *service   = info->service;
     const char *whitelist = args->user_whitelist;
+    long purgeTimeout     = args->user_purge;
+
     if (isHost) {
-        db = pamDb->m_hostDb;
         subject = info->host;
         data = info->user;
         purgeTimeout = args->host_purge;
         whitelist = args->host_whitelist;
     }
-    //if the db was not opened, or nothing to record on => do nothing
-    if (!db || !subject || !*subject)
+    if (!subject || !*subject)
         return 0;
     if (whitelistMatch(subject, whitelist, isHost))
         return 0;
-    if (!dbEnv || purgeTimeout <= 0)
+    if (purgeTimeout <= 0)
         return 1;
     if (!data)
         data = "";
@@ -499,17 +423,10 @@ static int recordSubject(const PamAblDbEnv *pamDb, const abl_args *args, abl_inf
 
     AuthState *subjectState = NULL;
     //all database actions need to be wrapped in a transaction
-    int err = startTransaction(dbEnv);
-    if (err) {
-        log_db_error(logContext, err, "starting the transaction to record_attempt.");
-        return err;
-    }
-    err = getUserOrHostInfo(db, subject, &subjectState);
-    if (err) {
-        log_db_error(logContext, err, "retrieving information failed.");
-    } else if (!subjectState) {
+    err = db->get(db, subject, &subjectState);
+    if (!err && !subjectState) {
         if (createEmptyState(CLEAR, &subjectState)) {
-            log_error(logContext, "Could not create an empty entry.");
+            log_error( "Could not create an empty entry.");
         }
     }
 
@@ -520,31 +437,25 @@ static int recordSubject(const PamAblDbEnv *pamDb, const abl_args *args, abl_inf
         //first do a purge, this way we can make some room for our next attempt
         purgeAuthState(subjectState, purgeTime);
         if (addAttempt(subjectState, info->blockReason, tm, data, service, args->lowerlimit, args->upperlimit)) {
-            log_error(logContext, "adding an attempt.");
+            log_error( "adding an attempt.");
         } else {
-            err = saveInfo(db, subject, subjectState);
-            if (err)
-                log_db_error(logContext, err, "saving the changed entry with added attempt.");
+            err = db->put(db, subject, subjectState);
         }
         destroyAuthState(subjectState);
     }
-    if (err)
-        abortTransaction(pamDb->m_environment);
-    else
-        commitTransaction(pamDb->m_environment);
     return err;
 }
 
-int record_attempt(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
-    if (!dbEnv || !args || !info)
+int record_attempt(const abl_db *db, const abl_args *args, abl_info *info) {
+    if (!db || !args || !info)
         return 1;
 
     int addHostResult = 0;
     int addUserResult = 0;
     if (info->host && *info->host)
-        addHostResult = recordSubject(dbEnv, args, info, logContext, 1);
+        addHostResult = recordSubject(db, args, info,  1);
     if (info->user && *info->user)
-        addUserResult = recordSubject(dbEnv, args, info, logContext, 0);
+        addUserResult = recordSubject(db, args, info,  0);
 
     return addHostResult || addUserResult;
 }
