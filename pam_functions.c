@@ -20,6 +20,7 @@
 #include "pam_abl.h"
 #include "config.h"
 #include "dbfun.h"
+#include "log.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -46,7 +47,7 @@ static void cleanup(pam_handle_t *pamh, void *data, int err) {
         log_debug("In cleanup, err is %08x", err);
 
         if (err) {
-            int recordResult = record_attempt(context->abldb, context->args, context->attemptInfo);
+            int recordResult = record_attempt(context->abldb, context->attemptInfo);
             log_debug("record returned %d", recordResult);
         }
         if (context->abldb)
@@ -78,14 +79,15 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         }
         memset(context, 0, sizeof(abl_context));
         context->attemptInfo = malloc(sizeof(abl_info));
-        context->args = config_create();
+        config_create();
+        context->args = args;
         if (!context->attemptInfo || !context->args) {
             err = PAM_BUF_ERR;
             goto psa_fail;
         }
         memset(context->attemptInfo, 0, sizeof(abl_info));
 
-        err = config_parse_args(argc, argv, context->args);
+        err = config_parse_args(argc, argv);
         if (err != 0) {
             err = PAM_SERVICE_ERR;
             log_error("Could not parse the config.");
@@ -109,7 +111,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         //we have a previous data pointer. We will ASSUME that it was from a previous failed attempt
         //a good example is sshd, when you try to login, you are given 3 attempts, so this function
         //can be called up to three times before the cleanup function is called.
-        int recordResult = record_attempt(context->abldb, context->args, context->attemptInfo);
+        int recordResult = record_attempt(context->abldb, context->attemptInfo);
         log_debug("record from authenticate returned %d", recordResult);
     }
 
@@ -132,7 +134,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         goto psa_fail;
     }
 
-    BlockState bState = check_attempt(context->abldb, context->args, context->attemptInfo);
+    BlockState bState = check_attempt(context->abldb, context->attemptInfo);
     if (bState == BLOCKED) {
         log_info("Blocking access from %s to service %s, user %s", context->attemptInfo->host, context->attemptInfo->service, context->attemptInfo->user);
         return PAM_AUTH_ERR;

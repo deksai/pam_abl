@@ -118,6 +118,6 @@ int bdb_c_close(abl_db *abldb);
 //int bdb_c_del(abl_db *abldb);
 //int bdb_c_replace(abl_db *abldb, char *data, unsigned dsize);
 int bdb_c_get(abl_db *abldb, char **key, unsigned *ksize, char **data, unsigned *dsize);
-abl_db* abl_db_open(const abl_args *args);
+abl_db* abl_db_open();
 
 #endif

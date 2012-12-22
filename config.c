@@ -61,18 +61,16 @@ static const char *is_arg(const char *name, const char *arg) {
     return eq;
 }
 
-static void config_clear(abl_args *args) {
+static void config_clear() {
     /* Init the args structure
      */
     args->db_home         = NULL;
-    args->db_module       = "/lib/abl/db4.so";
-    args->host_db         = NULL;
+    args->db_module       = NULL;
     args->host_rule       = NULL;
     args->host_purge      = HOST_PURGE;
     args->host_whitelist  = NULL;
     args->host_blk_cmd    = NULL;
     args->host_clr_cmd    = NULL;
-    args->user_db         = NULL;
     args->user_rule       = NULL;
     args->user_purge      = USER_PURGE;
     args->user_whitelist  = NULL;
@@ -85,12 +83,12 @@ static void config_clear(abl_args *args) {
 }
 
 void config_create() {
-    abl_args *retValue = malloc(sizeof(abl_args));
-    if (retValue)
-        config_clear(retValue);
+    args = malloc(sizeof(abl_args));
+    if (args)
+        config_clear(args);
 }
 
-static int parse_arg(const char *arg, abl_args *args) {
+static int parse_arg(const char *arg) {
     const char *v;
     int err;
 
@@ -125,8 +123,6 @@ static int parse_arg(const char *arg, abl_args *args) {
             args->upperlimit = upper;
             args->lowerlimit = lower;
         }
-    } else if (v = is_arg("host_db", arg), NULL != v) {
-        args->host_db = v;
     } else if (v = is_arg("host_rule", arg), NULL != v) {
         args->host_rule = v;
     } else if (v = is_arg("host_purge", arg), NULL != v) {
@@ -139,8 +135,6 @@ static int parse_arg(const char *arg, abl_args *args) {
         args->host_clr_cmd = v;
     } else if (v = is_arg("host_whitelist", arg), NULL != v) {
         args->host_whitelist = v;
-    } else if (v = is_arg("user_db", arg), NULL != v) {
-        args->user_db = v;
     } else if (v = is_arg("user_rule", arg), NULL != v) {
         args->user_rule = v;
     } else if (v = is_arg("user_purge", arg), NULL != v) {
@@ -154,7 +148,7 @@ static int parse_arg(const char *arg, abl_args *args) {
     } else if (v = is_arg("user_whitelist", arg), NULL != v) {
         args->user_whitelist = v;
     } else if (v = is_arg("config", arg), NULL != v) {
-        config_parse_file(v, args);
+        config_parse_file(v);
     } else {
         log_error("Illegal option: %s", arg);
         return EINVAL;
@@ -242,7 +236,7 @@ static int read_line(struct linebuf *b, struct reader *r) {
     return 0;
 }
 
-static const char *dups(abl_args *args, const char *s) {
+static const char *dups(const char *s) {
     int l = strlen(s);
     abl_string *str = malloc(sizeof(abl_string) + l + 1);
     memcpy(str + 1, s, l + 1);
@@ -252,7 +246,7 @@ static const char *dups(abl_args *args, const char *s) {
 }
 
 /* Parse the contents of a config file */
-int config_parse_file(const char *name, abl_args *args) {
+int config_parse_file(const char *name) {
     struct linebuf b;
     struct reader  r;
     int err = 0;
@@ -273,12 +267,12 @@ int config_parse_file(const char *name, abl_args *args) {
             goto done;
         }
         if (b.len > 1) {
-            if (l = dups(args, b.buf), NULL == l) {
+            if (l = dups(b.buf), NULL == l) {
                 err = ENOMEM;
                 goto done;
             }
-            log_debug(args, "%s: %s", name, l);
-            if (err = parse_arg(l, args), 0 != err) {
+            log_debug("Read from %s: %s", name, l);
+            if (err = parse_arg(l), 0 != err) {
                 goto done;
             }
         }
@@ -310,52 +304,48 @@ done:
     return err;
 }
 
-void dump_args(const abl_args *args) {
+void dump_args() {
     abl_string *s;
 
-    log_debug(args, "debug           = %d",  args->debug);
+    log_debug("Parsed configuration:");
+    log_debug("debug           = %d",  args->debug);
 
-    log_debug(args, "db_home         = %s",  args->db_home);
-    log_debug(args, "host_db         = %s",  args->host_db);
-    log_debug(args, "host_rule       = %s",  args->host_rule);
-    log_debug(args, "host_purge      = %ld", args->host_purge);
-    log_debug(args, "host_blk_cmd    = %s",  args->host_blk_cmd);
+    log_debug("db_home         = %s",  args->db_home);
+    log_debug("host_rule       = %s",  args->host_rule);
+    log_debug("host_purge      = %ld", args->host_purge);
+    log_debug("host_blk_cmd    = %s",  args->host_blk_cmd);
 
-    log_debug(args, "user_db         = %s",  args->user_db);
-    log_debug(args, "user_rule       = %s",  args->user_rule);
-    log_debug(args, "user_purge      = %ld", args->user_purge);
-    log_debug(args, "user_blk_cmd    = %s",  args->user_blk_cmd);
-    log_debug(args, "lower limit     = %ld", args->lowerlimit);
-    log_debug(args, "upper limit     = %ld", args->upperlimit);
+    log_debug("user_rule       = %s",  args->user_rule);
+    log_debug("user_purge      = %ld", args->user_purge);
+    log_debug("user_blk_cmd    = %s",  args->user_blk_cmd);
+    log_debug("lower limit     = %ld", args->lowerlimit);
+    log_debug("upper limit     = %ld", args->upperlimit);
     for (s = args->strs; NULL != s; s = s->link) {
-        log_debug(args, "str[%p] = %s", s, (char *) (s + 1));
+        log_debug("str[%p] = %s", s, (char *) (s + 1));
     }
 }
 
 /* Parse our argments and populate an abl_args structure accordingly.
  */
-int config_parse_args(int argc, const char **argv, abl_args *args) {
+int config_parse_args(int argc, const char **argv) {
     int argn;
     int err;
 
     config_clear(args);
 
     for (argn = 0; argn < argc; argn++) {
-        err = parse_arg(argv[argn], args);
+        err = parse_arg(argv[argn]);
         if (err) {
             return err;
         }
     }
-
-    if (args->debug)
-        dump_args(args);
 
     return 0;
 }
 
 /* Destroy any storage allocated by args
  */
-void config_free(abl_args *args) {
+void config_free() {
     abl_string *s, *next;
 
     for (s = args->strs; s != NULL; s = next) {
@@ -364,5 +354,6 @@ void config_free(abl_args *args) {
     }
     args->strs = NULL;
     free(args);
+    args = NULL;
 }
 

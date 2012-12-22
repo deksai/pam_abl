@@ -173,7 +173,7 @@ static void showblocking(const char *rule, AuthState *history, time_t now) {
     }
 }
 
-static int doshow(abl_db *db, const abl_args *args, int isHost) {
+static int doshow(abl_db *db, int isHost) {
     int         err     = 0;
     int         cnt     = 0;
     char        *buf    = NULL;
@@ -269,7 +269,7 @@ doshow_fail:
     return err;
 }
 
-static int dopurge(abl_db *abldb, const abl_args *args, int isHost) {
+static int dopurge(abl_db *abldb, int isHost) {
     int       err;
     char      *key = NULL, *data = NULL, *buf = NULL;
     time_t    now = time(NULL);
@@ -333,10 +333,10 @@ static int dopurge(abl_db *abldb, const abl_args *args, int isHost) {
                 info.service = NULL;
                 if (isHost) {
                     info.host = &buf[0];
-                    runHostCommand(CLEAR, args, &info);
+                    runHostCommand(CLEAR, &info);
                 } else {
                     info.user = &buf[0];
-                    runUserCommand(CLEAR, args, &info);
+                    runUserCommand(CLEAR, &info);
                 }
             }
         } else {
@@ -356,7 +356,7 @@ dopurge_fail:
     return err;
 }
 
-static int doupdate(abl_db *abldb, const abl_args *args, int isHost) {
+static int doupdate(abl_db *abldb, int isHost) {
     int         err;
     char        *buf    = NULL;
     char        *key    = NULL;
@@ -422,10 +422,10 @@ static int doupdate(abl_db *abldb, const abl_args *args, int isHost) {
                 info.service = NULL;
                 if (isHost) {
                     info.host = &buf[0];
-                    runHostCommand(updatedState, args, &info);
+                    runHostCommand(updatedState, &info);
                 } else {
                     info.user = &buf[0];
-                    runUserCommand(updatedState, args, &info);
+                    runUserCommand(updatedState, &info);
                 }
             }
         }
@@ -439,7 +439,7 @@ doupdate_fail:
     return err;
 }
 
-static int whitelist(abl_db *abldb, const abl_args *args, int isHost, const char **permit, int count) {
+static int whitelist(abl_db *abldb, int isHost, const char **permit, int count) {
     int       err   = 0;
     char      *key  = NULL;
     char      *data = NULL;
@@ -503,10 +503,10 @@ static int whitelist(abl_db *abldb, const abl_args *args, int isHost, const char
                 info.service = NULL;
                 if (isHost) {
                     info.host = &buf[0];
-                    runHostCommand(CLEAR, args, &info);
+                    runHostCommand(CLEAR, &info);
                 } else {
                     info.user = &buf[0];
-                    runUserCommand(CLEAR, args, &info);
+                    runUserCommand(CLEAR, &info);
                 }
             }
             ++del;
@@ -524,13 +524,13 @@ whitelist_fail:
     return err;
 }
 
-static int fail(const abl_db *abldb, const abl_args *args, abl_info *info) {
+static int fail(const abl_db *abldb, abl_info *info) {
     if (args == NULL || info == NULL || abldb == NULL)
         return 0;
 
-    int err = record_attempt(abldb, args, info);
+    int err = record_attempt(abldb, info);
     if (!err)
-        check_attempt(abldb, args, info);
+        check_attempt(abldb, info);
     return err;
 }
 
@@ -542,7 +542,7 @@ int main(int argc, char **argv) {
     char *service = "none";
     void *dblib;
     abl_db   *abldb = NULL;
-    abl_args *args = config_create();
+    config_create();
     abl_info info;
     BlockReason bReason = AUTH_FAILED;
 
@@ -638,18 +638,20 @@ int main(int argc, char **argv) {
     }
 
     mention("Reading config from %s", conf);
-    if (err = config_parse_file(conf, args), 0 != err) {
+    if (err = config_parse_file(conf), 0 != err) {
         return err;
     }
 
-    if (NULL == args->user_db) {
-        mention("No user_db in %s", conf);
+    if (NULL == args->db_module) {
+        log_error("No db_module in %s", conf);
+        goto main_done;
     }
 
-    if (NULL == args->host_db) {
-        mention("No host_db in %s", conf);
+    if (NULL == args->db_home) {
+        log_error("No db_home in %s", conf);
+        goto main_done;
     }
-    dump_args(args);
+    dump_args();
 
     for(n=0;n<num_users;n++){
         log_debug("user: %s",users[n]);
@@ -664,12 +666,12 @@ int main(int argc, char **argv) {
 
     dblib = dlopen(args->db_module, RTLD_LAZY);
     if (!dblib) {
-        log_sys_error(err, "Opening database module");
+        log_sys_error(err, "opening database module");
         goto main_done;
     }
     dlerror();
     db_open = dlsym(dblib, "abl_db_open");
-    abldb = db_open(args);
+    abldb = db_open();
     
     if (!abldb) {
         return 1;
@@ -677,9 +679,9 @@ int main(int argc, char **argv) {
 
     if (command == WHITELIST) {
         if (num_users > 0)
-            whitelist(abldb, args, 0, users, num_users);
+            whitelist(abldb, 0, users, num_users);
         if (num_hosts > 0)
-            whitelist(abldb, args, 1, hosts, num_hosts);
+            whitelist(abldb, 1, hosts, num_hosts);
         if (num_users == 0 && num_hosts == 0) {
             log_error("Asked to whitelist but no hosts or users given!");
             err = 1;
@@ -698,7 +700,7 @@ int main(int argc, char **argv) {
         info.blockReason = bReason;
         info.user = num_users > 0 ? users[0] : NULL;
         info.host = num_hosts > 0 ? hosts[0] : NULL;
-        fail(abldb, args, &info);
+        fail(abldb, &info);
     } else if (command == CHECK) {
         if (num_users == 0 && num_hosts == 0) {
             log_error("Asked to check but no hosts or users given!");
@@ -715,27 +717,27 @@ int main(int argc, char **argv) {
         info.service = service;
         info.host = num_hosts > 0 ? hosts[0] : NULL;
         info.user = num_users > 0 ? users[0] : NULL;
-        BlockState bState = check_attempt(abldb, args, &info);
+        BlockState bState = check_attempt(abldb, &info);
         if (bState == BLOCKED)
             err = 1;
         else
             err = 0;
         goto main_done;
     } else if (command == UPDATE) {
-        doupdate(abldb, args, 0);
-        doupdate(abldb, args, 1);
+        doupdate(abldb, 0);
+        doupdate(abldb, 1);
     } else if (command == PURGE) {
-        dopurge(abldb, args, 0);
-        dopurge(abldb, args, 1);
+        dopurge(abldb, 0);
+        dopurge(abldb, 1);
     } else if (num_users == 0 && num_hosts == 0) {
-        doshow(abldb, args, 0);
-        doshow(abldb, args, 1);
+        doshow(abldb, 0);
+        doshow(abldb, 1);
     }
 
 main_done:
     if (abldb)
         abldb->close(abldb);
     if (args)
-        config_free(args);
+        config_free();
     return err;
 }

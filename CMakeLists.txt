@@ -56,6 +56,7 @@ endif( NOT CMAKE_BUILD_TYPE)
 include_directories(${DB_INCLUDE_DIR} ${PAM_INCLUDE_DIRS})
 add_definitions(-W -Wall -Wshadow -Winit-self -Wredundant-decls -Wcast-align -Wfloat-equal -Winline -Wunreachable-code -Wmissing-declarations -Wswitch-enum -Wswitch-default -Wformat -Wmain -Wextra -Wunused -Wmissing-noreturn)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
+set(CMAKE_EXE_LINKER_FLAGS "-rdynamic")
 
 add_executable(pam_abl_bin ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TOOLS_SRC})
 set_target_properties(pam_abl_bin PROPERTIES OUTPUT_NAME pam_abl)

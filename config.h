@@ -28,13 +28,11 @@ typedef struct {
     /* Our args */
     const char      *db_home;
     const char      *db_module;
-    const char      *host_db;
     const char      *host_rule;
     long             host_purge;
     const char      *host_whitelist;
     const char      *host_blk_cmd;
     const char      *host_clr_cmd;
-    const char      *user_db;
     const char      *user_rule;
     long             user_purge;
     const char      *user_whitelist;
@@ -47,10 +45,11 @@ typedef struct {
     abl_string      *strs;
 } abl_args;
 
+abl_args *args;
 
-abl_args *config_create();
-void config_free(abl_args *args);
-int config_parse_args(int argc, const char **argv, abl_args *args);
-int config_parse_file(const char *name, abl_args *args);
-void dump_args(const abl_args *args);
+void config_create();
+void config_free();
+int config_parse_args(int argc, const char **argv);
+int config_parse_file(const char *name);
+void dump_args();
 #endif

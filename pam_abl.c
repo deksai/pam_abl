@@ -117,17 +117,17 @@ static int runCommand(const char *origCommand, const abl_info *info) {
     if(err != 0) {
         log_warning( "Failed to run command.");
     } else if (command) {
-        log_debug(args, "running command %s",command);
+        log_debug("running command %s",command);
         err = system(command);
         if (err == -1)
             log_warning( "Failed to run command: %s",command);
         free(command);
     } else if (!command)
-        log_debug(args, "No command to run for this situation.");
+        log_debug("No command to run for this situation.");
     return err;
 }
 
-int runHostCommand(BlockState bState, const abl_args *args, abl_info *info) {
+int runHostCommand(BlockState bState, abl_info *info) {
     const char *command = NULL;
     if (bState == BLOCKED)
         command = args->host_blk_cmd;
@@ -136,7 +136,7 @@ int runHostCommand(BlockState bState, const abl_args *args, abl_info *info) {
     return runCommand(command, info);
 }
 
-int runUserCommand(BlockState bState, const abl_args *args, abl_info *info) {
+int runUserCommand(BlockState bState, abl_info *info) {
     const char *command = NULL;
     if (bState == BLOCKED)
         command = args->user_blk_cmd;
@@ -176,7 +176,7 @@ static int update_status(const abl_db *db, const char *subject, const char *serv
     return err;
 }
 
-BlockState check_attempt(const abl_db *db, const abl_args *args, abl_info *info) {
+BlockState check_attempt(const abl_db *db, abl_info *info) {
     if (info)
         info->blockReason = AUTH_FAILED;
 
@@ -197,7 +197,7 @@ BlockState check_attempt(const abl_db *db, const abl_args *args, abl_info *info)
               &updatedHostState, &hostStateChanged);
         if (!err) {
             if (hostStateChanged)
-                runHostCommand(updatedHostState, args, info);
+                runHostCommand(updatedHostState, info);
         } else {
             //if something went wrong, we can't trust the value returned, so by default, do not block
             updatedHostState = CLEAR;
@@ -211,7 +211,7 @@ BlockState check_attempt(const abl_db *db, const abl_args *args, abl_info *info)
               &updatedUserState, &userStateChanged);
         if (!err) {
             if (userStateChanged)
-                runUserCommand(updatedUserState, args, info);
+                runUserCommand(updatedUserState, info);
         } else {
             //if something went wrong, do not trust the returned value
             //and by default do not block
@@ -393,7 +393,7 @@ int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
     return 0;
 }
 
-static int recordSubject(const abl_db *db, const abl_args *args, abl_info *info, int isHost) {
+static int recordSubject(const abl_db *db, abl_info *info, int isHost) {
     if (!db || !args || !info)
         return 1;
 
@@ -446,16 +446,16 @@ static int recordSubject(const abl_db *db, const abl_args *args, abl_info *info,
     return err;
 }
 
-int record_attempt(const abl_db *db, const abl_args *args, abl_info *info) {
+int record_attempt(const abl_db *db, abl_info *info) {
     if (!db || !args || !info)
         return 1;
 
     int addHostResult = 0;
     int addUserResult = 0;
     if (info->host && *info->host)
-        addHostResult = recordSubject(db, args, info,  1);
+        addHostResult = recordSubject(db, info,  1);
     if (info->user && *info->user)
-        addUserResult = recordSubject(db, args, info,  0);
+        addUserResult = recordSubject(db, info,  0);
 
     return addHostResult || addUserResult;
 }

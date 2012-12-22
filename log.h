@@ -63,7 +63,7 @@ void log_warning(const char *format, ...);
 /*
   If debugging output is requested, write the given message out
 */
-void log_debug(const abl_args *args, const char *format, ...);
+void log_debug(const char *format, ...);
 
 #if !defined(TOOLS) && !defined(TEST)
 void log_pam_error(pam_handle_t *handle, int err, const char *what);

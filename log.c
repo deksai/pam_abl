@@ -18,14 +18,16 @@
  */
 
 #include "log.h"
+#include <execinfo.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
-#define MODULE_NAME "pam-abl"
+#define MODULE_NAME "pam_abl"
 
 #define UNUSED(x) (void)(x)
 
@@ -83,10 +85,14 @@ void log_info(const char *format, ...) {
 void log_error(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
+
 #if defined(TEST) || defined(TOOLS)
+    //void *buffer[64];
     fprintf(stderr, "ERROR: ");
     vfprintf(stderr, format, ap);
     fprintf(stderr, "\n");
+    //backtrace(buffer,64);
+    //backtrace_symbols_fd(buffer,64,STDERR_FILENO);
 #else
     openlog(MODULE_NAME, LOG_CONS | LOG_PID, LOG_AUTHPRIV);
     vsyslog(LOG_WARNING, format, ap);
@@ -110,7 +116,7 @@ void log_warning(const char *format, ...) {
     va_end(ap);
 }
 
-void log_debug(const abl_args *args,const char *format, ...) {
+void log_debug(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
     if (args != NULL && args->debug) {

@@ -116,7 +116,7 @@ int abortTransaction(bdb_environment *env) {
 }
 */
 
-abl_db* abl_db_open(const abl_args *args) {
+abl_db* abl_db_open() {
     if (!args || !args->db_home || !*args->db_home)
         return NULL;
 
@@ -135,7 +135,7 @@ abl_db* abl_db_open(const abl_args *args) {
         goto open_fail;
     }
 
-    log_debug(args,"database opened");
+    log_debug("database opened");
 
     state = calloc(1,sizeof(bdb_state));
     if (state == NULL) goto open_fail;
@@ -170,7 +170,7 @@ void bdb_close(abl_db *abldb) {
 
 int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserState) {
     *hostOrUserState = NULL;
-    bdb_state *db = (bdb_state*) abldb->state;
+    bdb_state *db = abldb->state;
     if (!db || !db->m_environment || !db->m_handle || !hostOrUser)
         return 1;
     int err = 0;
@@ -187,9 +187,9 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
     key.data = (void*)hostOrUser;
     key.size = strlen(hostOrUser);
 
-    DB_TXN *tid = db->m_environment->m_transaction;
+    //DB_TXN *tid = db->m_environment->m_transaction;
 
-    err = db->m_handle->get(db->m_handle, tid, &key, &dbtdata, DB_RMW);
+    err = db->m_handle->get(db->m_handle, NULL, &key, &dbtdata, 0);
     /*Called with DB_DBT_USERMEM?  What was there wasn't enough*/
     if (err == DB_BUFFER_SMALL) {
         allocData = malloc(dbtdata.size);
@@ -199,7 +199,7 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
         dbtdata.ulen = dbtdata.size;
         dbtdata.size = 0;
         /* ...and try again. */
-        err = db->m_handle->get(db->m_handle, tid, &key, &dbtdata, 0600);
+        err = db->m_handle->get(db->m_handle, NULL, &key, &dbtdata, 0);
     }
 
     if (err != 0 && err != DB_NOTFOUND) {

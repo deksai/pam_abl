@@ -39,10 +39,9 @@ typedef struct abl_db {
   Every module needs to have this function, which fills in the structure
   above.  
   Given a full configuration open the required environment and databases
-  \param args The config with all the db params
   \return a valid abl_db on success, otherwise a nullptr
 
-  abl_db* abl_db_open(const abl_args *args);
+  abl_db* abl_db_open();
 */
 
 
