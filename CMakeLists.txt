@@ -67,8 +67,8 @@ target_link_libraries(pam_abl_bin ${DB_LIBRARY} dl)
 #set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
 #target_link_libraries(pam_abl_test ${DB_LIBRARY} )
 
-add_library(bdb SHARED ${ABL_DB_LIB_SRC})
-target_link_libraries(bdb ${DB_LIBRARY} ${PAM_LIBRARY})
+add_library(pam_abl_bdb SHARED ${ABL_DB_LIB_SRC})
+target_link_libraries(pam_abl_bdb ${DB_LIBRARY} ${PAM_LIBRARY})
 
 add_library(pam_abl_lib SHARED ${PAM_ABL_COMMON_SRC} ${PAM_ABL_LIB_SRC})
 set_target_properties(pam_abl_lib PROPERTIES OUTPUT_NAME pam_abl)

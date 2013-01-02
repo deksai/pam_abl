@@ -146,32 +146,33 @@ int runUserCommand(BlockState bState, abl_info *info) {
 }
 
 
-static int update_status(const abl_db *db, const char *subject, const char *service, const char *rule, time_t tm,
-                 BlockState *updatedState, int *stateChanged) {
+static int update_status(const abl_db *db, const char *object, 
+        ablObjectType type, const char *service, const char *rule, time_t tm, 
+        BlockState *updatedState, int *stateChanged) {
     int err = 0;
-    AuthState *subjectState = NULL;
+    AuthState *objectState = NULL;
 
     *stateChanged = 0; //assume the state will not change
 
-    err = db->get(db, subject, &subjectState);
+    err = db->get(db, object, &objectState, type);
     
-    //only update if we have a subjectState (It is already in the database and no error)
-    if (subjectState) {
-        *updatedState = rule_test( rule, subject, service, subjectState, tm);
+    //only update if we have a objectState (It is already in the database and no error)
+    if (objectState) {
+        *updatedState = rule_test( rule, object, service, objectState, tm);
         //is the state changed
-        if (*updatedState != getState(subjectState)) {
-            //update the BlockState in the subjectState
-            if (setState(subjectState, *updatedState)) {
+        if (*updatedState != getState(objectState)) {
+            //update the BlockState in the objectState
+            if (setState(objectState, *updatedState)) {
                 log_error( "The state could not be updated.");
             } else {
-                //save the subjectState
-                err = db->put(db, subject, subjectState);
+                //save the objectState
+                err = db->put(db, object, objectState, type);
                 if ( !err) {
                     *stateChanged = 1;
                 }
             }
         }
-        destroyAuthState(subjectState);
+        destroyAuthState(objectState);
     }
     return err;
 }
@@ -193,7 +194,7 @@ BlockState check_attempt(const abl_db *db, abl_info *info) {
     //do we need to update the host information?
     if (host && args->host_rule) {
         int hostStateChanged = 0;
-        int err = update_status(db, host, service, args->host_rule, tm,
+        int err = update_status(db, host, HOST, service, args->host_rule, tm,
               &updatedHostState, &hostStateChanged);
         if (!err) {
             if (hostStateChanged)
@@ -207,7 +208,7 @@ BlockState check_attempt(const abl_db *db, abl_info *info) {
     //now check the user
     if (user && *user && args->user_rule) {
         int userStateChanged = 0;
-        int err = update_status(db, user, service, args->user_rule, tm,
+        int err = update_status(db, user, USER, service, args->user_rule, tm,
               &updatedUserState, &userStateChanged);
         if (!err) {
             if (userStateChanged)
@@ -233,22 +234,22 @@ BlockState check_attempt(const abl_db *db, abl_info *info) {
 }
 
 /*
-static int whitelistMatch(const char *subject, const char *whitelist) {
-    if (!subject || !whitelist)
+static int whitelistMatch(const char *object, const char *whitelist) {
+    if (!object || !whitelist)
         return 0;
-    size_t subjLen = strlen(subject);
+    size_t subjLen = strlen(object);
     const char *begin = whitelist;
     const char *end = NULL;
     while ((end = strchr(begin, ';')) != NULL) {
         size_t len = (size_t)(end - begin);
         if (subjLen == len) {
-            if (memcmp(begin, subject, subjLen) == 0)
+            if (memcmp(begin, object, subjLen) == 0)
                 return 1;
         }
         begin = end+1;
     }
     if (subjLen == strlen(begin)) {
-        if (memcmp(begin, subject, subjLen) == 0)
+        if (memcmp(begin, object, subjLen) == 0)
             return 1;
     }
     return 0;
@@ -349,16 +350,16 @@ int inSameSubnet(u_int32_t host, u_int32_t ip, int netmask) {
     return host == ip;
 }
 
-int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
-    if (!subject || !whitelist)
+int whitelistMatch(const char *object, const char *whitelist, ablObjectType type) {
+    if (!object || !whitelist)
         return 0;
 
-    size_t subjLen = strlen(subject);
+    size_t subjLen = strlen(object);
     int hostParsed = 0;
     u_int32_t ip = 0;
-    if (isHost) {
+    if (type & HOST) {
         int netmask = 0;
-        if (parseIP(subject, subjLen, &netmask, &ip) == 0 && netmask == -1)
+        if (parseIP(object, subjLen, &netmask, &ip) == 0 && netmask == -1)
             hostParsed = 1;
     }
 
@@ -374,7 +375,7 @@ int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
                     return 1;
             }
         }
-        if (subjLen == len && memcmp(begin, subject, subjLen) == 0)
+        if (subjLen == len && memcmp(begin, object, subjLen) == 0)
                 return 1;
         begin = end+1;
     }
@@ -388,31 +389,31 @@ int whitelistMatch(const char *subject, const char *whitelist, int isHost) {
                 return 1;
         }
     }
-    if (subjLen == len && memcmp(begin, subject, subjLen) == 0)
+    if (subjLen == len && memcmp(begin, object, subjLen) == 0)
         return 1;
     return 0;
 }
 
-static int recordSubject(const abl_db *db, abl_info *info, int isHost) {
+static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
     if (!db || !args || !info)
         return 1;
 
     int         err       = 0;
-    const char *subject   = info->user;
+    const char *object    = info->user;
     const char *data      = info->host;
     const char *service   = info->service;
     const char *whitelist = args->user_whitelist;
     long purgeTimeout     = args->user_purge;
 
-    if (isHost) {
-        subject = info->host;
+    if (type & HOST) {
+        object = info->host;
         data = info->user;
         purgeTimeout = args->host_purge;
         whitelist = args->host_whitelist;
     }
-    if (!subject || !*subject)
+    if (!object || !*object)
         return 0;
-    if (whitelistMatch(subject, whitelist, isHost))
+    if (whitelistMatch(object, whitelist, type))
         return 0;
     if (purgeTimeout <= 0)
         return 1;
@@ -421,27 +422,26 @@ static int recordSubject(const abl_db *db, abl_info *info, int isHost) {
     if (!service)
         service = "";
 
-    AuthState *subjectState = NULL;
-    //all database actions need to be wrapped in a transaction
-    err = db->get(db, subject, &subjectState);
-    if (!err && !subjectState) {
-        if (createEmptyState(CLEAR, &subjectState)) {
+    AuthState *objectState = NULL;
+    err = db->get(db, object, &objectState, type);
+    if (!err && !objectState) {
+        if (createEmptyState(CLEAR, &objectState)) {
             log_error( "Could not create an empty entry.");
         }
     }
 
-    if (subjectState) {
+    if (objectState) {
         time_t tm = time(NULL);
         time_t purgeTime = tm - purgeTimeout;
         //if it already existed in the db, we loaded it and otherwise we created an empty state.
         //first do a purge, this way we can make some room for our next attempt
-        purgeAuthState(subjectState, purgeTime);
-        if (addAttempt(subjectState, info->blockReason, tm, data, service, args->lowerlimit, args->upperlimit)) {
+        purgeAuthState(objectState, purgeTime);
+        if (addAttempt(objectState, info->blockReason, tm, data, service, args->lowerlimit, args->upperlimit)) {
             log_error( "adding an attempt.");
         } else {
-            err = db->put(db, subject, subjectState);
+            err = db->put(db, object, objectState, type);
         }
-        destroyAuthState(subjectState);
+        destroyAuthState(objectState);
     }
     return err;
 }
@@ -453,9 +453,9 @@ int record_attempt(const abl_db *db, abl_info *info) {
     int addHostResult = 0;
     int addUserResult = 0;
     if (info->host && *info->host)
-        addHostResult = recordSubject(db, info,  1);
+        addHostResult = record_object(db, info,  HOST);
     if (info->user && *info->user)
-        addUserResult = recordSubject(db, info,  0);
+        addUserResult = record_object(db, info,  USER);
 
     return addHostResult || addUserResult;
 }

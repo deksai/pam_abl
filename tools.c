@@ -173,7 +173,7 @@ static void showblocking(const char *rule, AuthState *history, time_t now) {
     }
 }
 
-static int doshow(abl_db *db, int isHost) {
+static int doshow(abl_db *db, ablObjectType type) {
     int         err     = 0;
     int         cnt     = 0;
     char        *buf    = NULL;
@@ -188,18 +188,19 @@ static int doshow(abl_db *db, int isHost) {
 
     if (!args || !db) return 0;
 
-    if(isHost) {
+    if(type && HOST) {
         thing = "hosts";
         rule = args->host_rule;
+        db->c_open(db, HOST);
     } else {
         thing = "users";
         rule = args->user_rule;
+        db->c_open(db, USER);
     }
 
     //Section header for output
     printf("Failed %s:\n", thing);
 
-    db->c_open(db);
     for (;;) {
         if (db->c_get(db, &key, &ksize, &data, &dsize))
             break;
@@ -269,7 +270,7 @@ doshow_fail:
     return err;
 }
 
-static int dopurge(abl_db *abldb, int isHost) {
+static int dopurge(abl_db *abldb, ablObjectType type) {
     int       err;
     char      *key = NULL, *data = NULL, *buf = NULL;
     time_t    now = time(NULL);
@@ -280,17 +281,14 @@ static int dopurge(abl_db *abldb, int isHost) {
     if (!abldb || !args)
         return 1; 
 
-    if(isHost) {
+    if(type && HOST) {
         purgeTime = now - args->host_purge;
     } else {
         purgeTime = now - args->user_purge;
     }
 
-
-    //Cheat, because get_dbname is broken starting on some version lower than 4.8
     mention("Purging");
-
-    if (err = abldb->c_open(abldb), 0 != err) {
+    if (err = abldb->c_open(abldb, type), 0 != err) {
         goto dopurge_fail;
     }
 
@@ -307,7 +305,7 @@ static int dopurge(abl_db *abldb, int isHost) {
         }
         purgeAuthState(authstate, purgeTime);
         if (getNofAttempts(authstate) == 0) {
-            err = abldb->del(abldb,key);
+            err = abldb->del(abldb, key, type);
             if (err) {
                 destroyAuthState(authstate);
                 goto dopurge_fail;
@@ -331,7 +329,7 @@ static int dopurge(abl_db *abldb, int isHost) {
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;
-                if (isHost) {
+                if (type && HOST) {
                     info.host = &buf[0];
                     runHostCommand(CLEAR, &info);
                 } else {
@@ -341,7 +339,7 @@ static int dopurge(abl_db *abldb, int isHost) {
             }
         } else {
             //err = cursor->c_put(cursor, &key, &newData, DB_CURRENT);
-            err = abldb->put(abldb, key, authstate);
+            err = abldb->put(abldb, key, authstate, type);
             if (err) {
                 goto dopurge_fail;
             }
@@ -356,7 +354,7 @@ dopurge_fail:
     return err;
 }
 
-static int doupdate(abl_db *abldb, int isHost) {
+static int doupdate(abl_db *abldb, ablObjectType type) {
     int         err;
     char        *buf    = NULL;
     char        *key    = NULL;
@@ -370,13 +368,13 @@ static int doupdate(abl_db *abldb, int isHost) {
     if (!abldb || !args)
         return 1;
 
-    if(isHost) {
+    if(type && HOST) {
         rule = args->host_rule;
     } else {
         rule = args->user_rule;
     }
 
-    if (err = abldb->c_open(abldb), 0 != err) {
+    if (err = abldb->c_open(abldb, type), 0 != err) {
         goto doupdate_fail;
     }
 
@@ -411,7 +409,7 @@ static int doupdate(abl_db *abldb, int isHost) {
             if (setState(authstate, updatedState)) {
                 log_error("The state could not be updated.");
             } else {
-                err = abldb->put(abldb, key, authstate);
+                err = abldb->put(abldb, key, authstate, type);
                 if (err) {
                     goto doupdate_fail;
                 }
@@ -420,7 +418,7 @@ static int doupdate(abl_db *abldb, int isHost) {
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;
-                if (isHost) {
+                if (type && HOST) {
                     info.host = &buf[0];
                     runHostCommand(updatedState, &info);
                 } else {
@@ -439,7 +437,7 @@ doupdate_fail:
     return err;
 }
 
-static int whitelist(abl_db *abldb, int isHost, const char **permit, int count) {
+static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int count) {
     int       err   = 0;
     char      *key  = NULL;
     char      *data = NULL;
@@ -452,7 +450,7 @@ static int whitelist(abl_db *abldb, int isHost, const char **permit, int count) 
     if (!abldb || !args)
         return 0;
 
-    if (err = abldb->c_open(abldb), 0 != err) {
+    if (err = abldb->c_open(abldb, type), 0 != err) {
         goto whitelist_fail;
     }
 
@@ -478,7 +476,7 @@ static int whitelist(abl_db *abldb, int isHost, const char **permit, int count) 
                 log_error("Could not parse a attempts in the database.");
                 continue;
             }
-            err = abldb->del(abldb, key);
+            err = abldb->del(abldb, key, type);
             if (err) {
                 goto whitelist_fail;
             }
@@ -501,7 +499,7 @@ static int whitelist(abl_db *abldb, int isHost, const char **permit, int count) 
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;
-                if (isHost) {
+                if (type && HOST) {
                     info.host = &buf[0];
                     runHostCommand(CLEAR, &info);
                 } else {

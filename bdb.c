@@ -120,26 +120,33 @@ abl_db* abl_db_open() {
     if (!args || !args->db_home || !*args->db_home)
         return NULL;
 
-    int             err         = 0;
-    abl_db          *db         = NULL;
-    bdb_environment *env        = NULL;
-    bdb_state       *state      = NULL;
-    DB              *dbHandle   = NULL;
+    int             err             = 0;
+    abl_db          *db             = NULL;
+    bdb_environment *env            = NULL;
+    bdb_state       *state          = NULL;
+    DB              *host_handle    = NULL;
+    DB              *user_handle    = NULL;
 
     if (create_environment(args->db_home, &env))
         goto open_fail;
-    if (db_create(&dbHandle, env->m_envHandle, 0))
+    if (db_create(&host_handle, env->m_envHandle, 0))
+        goto open_fail;
+    if (db_create(&user_handle, env->m_envHandle, 0))
         goto open_fail;
 
-    if ((err = dbHandle->open(dbHandle, NULL, "db", "db", DB_BTREE, DB_CREATE|DB_AUTO_COMMIT|DB_MULTIVERSION, DBPERM)) != 0) {
+    if ((err = host_handle->open(host_handle, NULL, "host", "db", DB_BTREE, DB_CREATE|DB_AUTO_COMMIT|DB_MULTIVERSION, DBPERM)) != 0) {
+        goto open_fail;
+    }
+    if ((err = user_handle->open(user_handle, NULL, "user", "db", DB_BTREE, DB_CREATE|DB_AUTO_COMMIT|DB_MULTIVERSION, DBPERM)) != 0) {
         goto open_fail;
     }
 
-    log_debug("database opened");
+    log_debug("databases opened");
 
     state = calloc(1,sizeof(bdb_state));
     if (state == NULL) goto open_fail;
-    state->m_handle = dbHandle;
+    state->m_hhandle = host_handle;
+    state->m_uhandle = user_handle;
     state->m_environment = env;
 
     db = calloc(1,sizeof(abl_db));
@@ -160,19 +167,26 @@ open_fail:
 
 void bdb_close(abl_db *abldb) {
     bdb_state *db = abldb->state;
-    if (db && db->m_handle)
-        db->m_handle->close(db->m_handle,0);
+    if (db && db->m_hhandle && db->m_uhandle)
+        db->m_hhandle->close(db->m_hhandle,0);
+        db->m_uhandle->close(db->m_uhandle,0);
     destroy_environment(db->m_environment);
-    db->m_handle = NULL;
     free(db);
     free(abldb);
 }
 
-int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserState) {
+int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserState, ablObjectType type) {
     *hostOrUserState = NULL;
     bdb_state *db = abldb->state;
-    if (!db || !db->m_environment || !db->m_handle || !hostOrUser)
+    if (!db || !db->m_environment || !db->m_hhandle || !db->m_uhandle || !hostOrUser)
         return 1;
+    
+    DB *db_handle = NULL;
+    if ( type & HOST )
+        db_handle = db->m_hhandle;
+    else
+        db_handle = db->m_uhandle;
+
     int err = 0;
     void *allocData = NULL;
 
@@ -189,7 +203,7 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
 
     //DB_TXN *tid = db->m_environment->m_transaction;
 
-    err = db->m_handle->get(db->m_handle, NULL, &key, &dbtdata, 0);
+    err = db_handle->get(db_handle, NULL, &key, &dbtdata, 0);
     /*Called with DB_DBT_USERMEM?  What was there wasn't enough*/
     if (err == DB_BUFFER_SMALL) {
         allocData = malloc(dbtdata.size);
@@ -199,11 +213,11 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
         dbtdata.ulen = dbtdata.size;
         dbtdata.size = 0;
         /* ...and try again. */
-        err = db->m_handle->get(db->m_handle, NULL, &key, &dbtdata, 0);
+        err = db_handle->get(db_handle, NULL, &key, &dbtdata, 0);
     }
 
     if (err != 0 && err != DB_NOTFOUND) {
-        db->m_handle->err(db->m_handle, err, "DB->get");
+        db_handle->err(db_handle, err, "DB->get");
         if (allocData)
             free(allocData);
         return err;
@@ -222,12 +236,16 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
     return err;
 }
 
-int bdb_put(const abl_db *abldb, const char *hostOrUser, AuthState *hostOrUserState) {
+int bdb_put(const abl_db *abldb, const char *hostOrUser, AuthState *hostOrUserState, ablObjectType type) {
     bdb_state *db = abldb->state;
-    if (!db || !db->m_environment || !db->m_handle || !hostOrUser || !*hostOrUser || !hostOrUserState)
+    if (!db || !db->m_environment || !db->m_hhandle || !db->m_uhandle || !hostOrUser || !*hostOrUser || !hostOrUserState)
         return 1;
+    DB *db_handle = NULL;
+    if ( type & HOST )
+        db_handle = db->m_hhandle;
+    else
+        db_handle = db->m_uhandle;
 
-    DB_TXN *tid = db->m_environment->m_transaction;
 
     DBT key, data;
     memset(&key, 0, sizeof(DBT));
@@ -236,28 +254,40 @@ int bdb_put(const abl_db *abldb, const char *hostOrUser, AuthState *hostOrUserSt
     key.size = strlen(hostOrUser);
     data.data = hostOrUserState->m_data;
     data.size = hostOrUserState->m_usedSize;
-    int err = db->m_handle->put(db->m_handle, tid, &key, &data, 0);
+    int err = db_handle->put(db_handle, NULL, &key, &data, 0);
     return err;
 }
 
-int bdb_del(const abl_db *abldb, const char *hostOrUser) {
+int bdb_del(const abl_db *abldb, const char *hostOrUser, ablObjectType type) {
     bdb_state *db = abldb->state;
-    if (!db || !db->m_environment || !db->m_handle || !hostOrUser || !*hostOrUser)
+    if (!db || !db->m_environment || !db->m_hhandle || !db->m_uhandle || !hostOrUser || !*hostOrUser)
         return 1;
-    DB_TXN *tid = db->m_environment->m_transaction;
-
     DBT key;
+    DB *db_handle = NULL;
+    if ( type & HOST )
+        db_handle = db->m_hhandle;
+    else
+        db_handle = db->m_uhandle;
+
     memset(&key, 0, sizeof(key));
     key.data = (void*)hostOrUser;
     key.size = strlen(hostOrUser);
-    int err = db->m_handle->del(db->m_handle, tid, &key, 0);
+    int err = db_handle->del(db_handle, NULL, &key, 0);
     return err;
 }
 
-int bdb_c_open(abl_db *abldb) {
+int bdb_c_open(abl_db *abldb, ablObjectType type) {
     int err = 0;
     bdb_state *db = abldb->state;
-    if (err = db->m_handle->cursor(db->m_handle, NULL, &db->m_cursor, DB_TXN_SNAPSHOT), 0 != err) {
+    if (!db->m_hhandle || !db->m_uhandle)
+        return 1;
+    DB *db_handle = NULL;
+    if ( type & HOST )
+        db_handle = db->m_hhandle;
+    else
+        db_handle = db->m_uhandle;
+    
+    if (err = db_handle->cursor(db_handle, NULL, &db->m_cursor, DB_TXN_SNAPSHOT), 0 != err) {
         log_db_error(err, "creating cursor");
     }
     return err;

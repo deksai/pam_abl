@@ -1,5 +1,6 @@
 /*
- *   pam_abl - a PAM module and program for automatic blacklisting of hosts and users
+ *   pam_abl - a PAM module and program for automatic blacklisting of hosts
+ *   and users
  *
  *   Copyright (C) 2005-2012
  *
@@ -25,7 +26,9 @@
 #include <sys/types.h>
 
 typedef struct abl_db abl_db;
+
 abl_db *(*db_open)();
+
 typedef struct {
     BlockReason blockReason;
     const char *user;
@@ -69,7 +72,7 @@ int record_attempt(const abl_db *db, abl_info *info);
   Following functions are only 'exported' for testing purposes
 */
 int parseIP(const char *ipStr, size_t length, int *netmask, u_int32_t *ip);
-int whitelistMatch(const char *subject, const char *whitelist, int isHost);
+int whitelistMatch(const char *subject, const char *whitelist, ablObjectType type);
 int inSameSubnet(u_int32_t host, u_int32_t ip, int netmask);
 
 #endif

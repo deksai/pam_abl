@@ -31,7 +31,8 @@ typedef struct bdb_environment {
 } bdb_environment;
 
 typedef struct bdb_state {
-    DB *m_handle;
+    DB *m_uhandle;
+    DB *m_hhandle;
     DBC *m_cursor;
     bdb_environment *m_environment;
 } bdb_state;
@@ -95,7 +96,7 @@ void bdb_close(abl_db *);
   \subjectState Returns the state of the subject. If it is not found subjectState will be null
   \return zero on success, non zero otherwise
 */
-int bdb_get(const abl_db *, const char *, AuthState **);
+int bdb_get(const abl_db *, const char *, AuthState **, ablObjectType type);
 
 /*
   Save the given AuthState for the given subject in the given database
@@ -105,15 +106,15 @@ int bdb_get(const abl_db *, const char *, AuthState **);
   \param subjectState The state to save, this needs to be a valid state
   \return zero on success, non zero otherwise
 */
-int bdb_put(const abl_db *, const char *, AuthState *);
+int bdb_put(const abl_db *, const char *, AuthState *, ablObjectType type);
 
 /*
   Remove a given subject out of the given database
   Make sure that you already started a transaction before calling this method
 */
-int bdb_del(const abl_db *, const char *);
+int bdb_del(const abl_db *, const char *, ablObjectType type);
 
-int bdb_c_open(abl_db *abldb);
+int bdb_c_open(abl_db *abldb, ablObjectType type);
 int bdb_c_close(abl_db *abldb);
 //int bdb_c_del(abl_db *abldb);
 //int bdb_c_replace(abl_db *abldb, char *data, unsigned dsize);

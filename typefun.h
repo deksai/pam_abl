@@ -23,6 +23,11 @@
 #include <time.h>
 
 typedef enum {
+    HOST = (1 << 0),
+    USER = (1 << 1)
+} ablObjectType;
+
+typedef enum {
     HOST_BLOCKED = 0x01,
     USER_BLOCKED = 0x02,
     BOTH_BLOCKED = 0x03,

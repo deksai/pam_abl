@@ -24,10 +24,10 @@
 typedef struct abl_db abl_db;
 typedef struct abl_db {
     void (*close)(abl_db *db);
-    int (*put)(const abl_db *, const char *, AuthState *);
-    int (*del)(const abl_db *, const char *subject);
-    int (*get)(const abl_db *, const char *subject, AuthState **subjectState);
-    int (*c_open)(abl_db *);
+    int (*put)(const abl_db *, const char *object, AuthState *, ablObjectType);
+    int (*del)(const abl_db *, const char *object, ablObjectType);
+    int (*get)(const abl_db *, const char *object, AuthState **, ablObjectType);
+    int (*c_open)(abl_db *, ablObjectType);
     int (*c_close)(abl_db *);
     int (*c_get)(abl_db *,char **key,unsigned *ksize,char **data,unsigned *dsize);
     void *state;
