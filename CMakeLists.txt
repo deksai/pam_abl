@@ -31,7 +31,7 @@ set(ABL_DB_LIB_SRC
 #	test_types.c
 #)
 
-find_package(BerkeleyDB REQUIRED)
+find_package(BerkeleyDB)
 find_package(Pam REQUIRED)
 
 #Building pam_abl using a different version of Berkeley db.
@@ -78,3 +78,4 @@ INSTALL(TARGETS pam_abl_bin
 	RUNTIME DESTINATION bin
 )
 INSTALL(TARGETS pam_abl_lib DESTINATION lib/security)
+INSTALL(TARGETS pam_abl_bdb DESTINATION lib/security)

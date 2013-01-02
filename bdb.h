@@ -45,7 +45,7 @@ void log_db_error(int err, const char *what);
 
 
 /*
-  Close a full environment. Make sure no transaction is open
+  Close a full environment.
   \note Do not use the env pointer anymore after calling this function
 */
 void destroy_environment(bdb_environment *env);
@@ -60,27 +60,6 @@ void destroy_environment(bdb_environment *env);
 */
 int create_environment(const char *home, bdb_environment **env);
 
-/*
-  Start a transaction on the given environment
-  \return zero on success, otherwise non zero
-  \note For the moment only on transaction can be active at the same time.
-  \note ALL database actions need to be wrapped in a transaction for them to work.
-*/
-//int startTransaction(bdb_environment *env);
-
-/*
-  End a transaction started on the environment applying all the changes
-  \return zero on success, otherwise non zero
-  \note calling this function on an environment with no transaction started sill succeed
-*/
-//int commitTransaction(bdb_environment *env);
-
-/*
-  End a transaction started on the environment discarding all the changes
-  \return zero on success, otherwise non zero
-  \note calling this function on an environment with no transaction started sill succeed
-*/
-//int abortTransaction(bdb_environment *env);
 
 /*
   Close an open Database. Make sure that there are no transaction on this db.
@@ -90,35 +69,65 @@ void bdb_close(abl_db *);
 
 /*
   Get the authentication state for the given subject.
-  Make sure that you already started a transaction before calling this method
-  \param db The database to get the info from
-  \param subject The subject to look for, this ptr has te be valid and not an empty string
-  \subjectState Returns the state of the subject. If it is not found subjectState will be null
+  \param abl_db The database to get the info from
+  \param char The object to look for, this ptr has te be valid and not an empty string
+  \param AuthState Returns the state of the object. If it is not found AuthState will be null
+  \param ablObjectType Look for HOST or USER (HOST|USER perhaps in the future)
   \return zero on success, non zero otherwise
 */
-int bdb_get(const abl_db *, const char *, AuthState **, ablObjectType type);
+int bdb_get(const abl_db *, const char *, AuthState **, ablObjectType);
 
 /*
   Save the given AuthState for the given subject in the given database
-  Make sure that you already started a transaction before calling this method
-  \param db The database to store the value in
-  \param subject The subject to use to store the value. This needs to be valid and not an empty string
-  \param subjectState The state to save, this needs to be a valid state
+  \param abl_db The database to store the value in
+  \param const_char The object to store. This needs to be valid and not an empty string
+  \param AuthState The state to save, this needs to be a valid state
+  \param ablObjectType Search for either HOST or USER
   \return zero on success, non zero otherwise
 */
-int bdb_put(const abl_db *, const char *, AuthState *, ablObjectType type);
+int bdb_put(const abl_db *, const char *, AuthState *, ablObjectType);
 
 /*
   Remove a given subject out of the given database
-  Make sure that you already started a transaction before calling this method
+  \param abl_db The database object to use.
+  \param ablObjectType Search for either HOST or USER
+  \return zero on success, non zero otherwise
 */
 int bdb_del(const abl_db *, const char *, ablObjectType type);
 
+/*
+  Open a cursor for the given type of database.
+  \param abl_db The database object to use.
+  \param ablObjectType Search for either HOST or USER
+  \return zero on success, non zero otherwise
+*/
 int bdb_c_open(abl_db *abldb, ablObjectType type);
+
+/*
+  Close the currently open cursor.
+  \param abl_db The database object to use.
+  \return zero on success, non zero otherwise
+*/
 int bdb_c_close(abl_db *abldb);
+
 //int bdb_c_del(abl_db *abldb);
 //int bdb_c_replace(abl_db *abldb, char *data, unsigned dsize);
+
+/*
+  Get the current object at the cursor.
+  \param abl_db The database object to use.
+  \param char** The key string will be set to the object's name as it was stored.
+  \param int* This will be set to the size of the retrieved key.
+  \param char** The binary data belonging to the above key.
+  \param int* This will be set to the size of the above data.
+  \return zero on success, non zero otherwise
+*/
 int bdb_c_get(abl_db *abldb, char **key, unsigned *ksize, char **data, unsigned *dsize);
+
+/*
+  Opens a database environment.
+  \return A pointer to the opened database object.
+*/
 abl_db* abl_db_open();
 
 #endif
