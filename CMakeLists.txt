@@ -19,16 +19,20 @@ set(PAM_ABL_LIB_SRC
 	pam_functions.c
 )
 
-set(ABL_DB_LIB_SRC
+set(ABL_BDB_LIB_SRC
     bdb.c
 )
 
+set(ABL_KCDB_LIB_SRC
+    kc.c
+)
+
 #set(PAM_ABL_TEST_SRC
-#	test_abl.c
-#	test.c
-#	test_db.c
-#	test_rule.c
-#	test_types.c
+#   test_abl.c
+#   test.c
+#   test_db.c
+#   test_rule.c
+#   test_types.c
 #)
 
 find_package(BerkeleyDB)
@@ -67,8 +71,11 @@ target_link_libraries(pam_abl_bin ${DB_LIBRARY} dl)
 #set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
 #target_link_libraries(pam_abl_test ${DB_LIBRARY} )
 
-add_library(pam_abl_bdb SHARED ${ABL_DB_LIB_SRC})
+add_library(pam_abl_bdb SHARED ${ABL_BDB_LIB_SRC})
 target_link_libraries(pam_abl_bdb ${DB_LIBRARY} ${PAM_LIBRARY})
+
+add_library(pam_abl_kc SHARED ${ABL_KCDB_LIB_SRC})
+target_link_libraries(pam_abl_kc -lkyotocabinet -lz -lstdc++ -lrt -lpthread -lm -lc ${PAM_LIBRARY})
 
 add_library(pam_abl_lib SHARED ${PAM_ABL_COMMON_SRC} ${PAM_ABL_LIB_SRC})
 set_target_properties(pam_abl_lib PROPERTIES OUTPUT_NAME pam_abl)

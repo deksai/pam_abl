@@ -17,25 +17,19 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BDB_H
-#define BDB_H
+#ifndef KT_H
+#define KT_H
 
 #include "dbfun.h"
 #include "log.h"
 
-#include <db.h>
+#include <kclangc.h>
 
-typedef struct bdb_environment {
-    DB_ENV *m_envHandle;
-    DB_TXN *m_transaction;
-} bdb_environment;
-
-typedef struct bdb_state {
-    DB *m_uhandle;
-    DB *m_hhandle;
-    DBC *m_cursor;
-    bdb_environment *m_environment;
-} bdb_state;
+typedef struct kc_state {
+    KCDB *user;
+    KCDB *host;
+    KCCUR *cursor;
+} kc_state;
 
 /*
   Log a Berkeley db error. This will also lookup the string representation of err
@@ -43,29 +37,11 @@ typedef struct bdb_state {
 */
 void log_db_error(int err, const char *what);
 
-
-/*
-  Close a full environment.
-  \note Do not use the env pointer anymore after calling this function
-*/
-void destroy_environment(bdb_environment *env);
-
-
-/*
-  Create and open the database environment
-  \param home The place where the Berkeley db can put itś locking files and such
-  \param env The newly created environment will be returned through this pointer
-  \return zero on success, otherwise non zero
-  \note context can be a NULL ptr, do not delete context while the environment is still active
-*/
-int create_environment(const char *home, bdb_environment **env);
-
-
 /*
   Close an open Database. Make sure that there are no transaction on this db.
   Do not use the db pointer after calling this function.
 */
-void bdb_close(abl_db *);
+void kc_close(abl_db *);
 
 /*
   Get the authentication state for the given subject.
@@ -75,7 +51,7 @@ void bdb_close(abl_db *);
   \param ablObjectType Look for HOST or USER (HOST|USER perhaps in the future)
   \return zero on success, non zero otherwise
 */
-int bdb_get(const abl_db *, const char *, AuthState **, ablObjectType);
+int kc_get(const abl_db *, const char *, AuthState **, ablObjectType);
 
 /*
   Save the given AuthState for the given subject in the given database
@@ -85,7 +61,7 @@ int bdb_get(const abl_db *, const char *, AuthState **, ablObjectType);
   \param ablObjectType Search for either HOST or USER
   \return zero on success, non zero otherwise
 */
-int bdb_put(const abl_db *, const char *, AuthState *, ablObjectType);
+int kc_put(const abl_db *, const char *, AuthState *, ablObjectType);
 
 /*
   Remove a given subject out of the given database
@@ -93,7 +69,7 @@ int bdb_put(const abl_db *, const char *, AuthState *, ablObjectType);
   \param ablObjectType Search for either HOST or USER
   \return zero on success, non zero otherwise
 */
-int bdb_del(const abl_db *, const char *, ablObjectType type);
+int kc_del(const abl_db *, const char *, ablObjectType type);
 
 /*
   Open a cursor for the given type of database.
@@ -101,17 +77,14 @@ int bdb_del(const abl_db *, const char *, ablObjectType type);
   \param ablObjectType Search for either HOST or USER
   \return zero on success, non zero otherwise
 */
-int bdb_c_open(abl_db *abldb, ablObjectType type);
+int kc_c_open(abl_db *abldb, ablObjectType type);
 
 /*
   Close the currently open cursor.
   \param abl_db The database object to use.
   \return zero on success, non zero otherwise
 */
-int bdb_c_close(abl_db *abldb);
-
-//int bdb_c_del(abl_db *abldb);
-//int bdb_c_replace(abl_db *abldb, char *data, unsigned dsize);
+int kc_c_close(abl_db *abldb);
 
 /*
   Get the current object at the cursor.
@@ -122,7 +95,7 @@ int bdb_c_close(abl_db *abldb);
   \param int* This will be set to the size of the above data.
   \return zero on success, non zero otherwise
 */
-int bdb_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize);
+int kc_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize);
 
 /*
   Opens a database environment.

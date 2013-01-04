@@ -323,7 +323,7 @@ int bdb_c_replace(abl_db *abldb, char *data, unsigned dsize) {
 }
 */
 
-int bdb_c_get(abl_db *abldb, char **key, unsigned *ksize, char **data, unsigned *dsize) {
+int bdb_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize) {
     int err = 0;
     DBT m_key;
     DBT m_data;

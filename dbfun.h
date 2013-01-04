@@ -29,7 +29,7 @@ typedef struct abl_db {
     int (*get)(const abl_db *, const char *object, AuthState **, ablObjectType);
     int (*c_open)(abl_db *, ablObjectType);
     int (*c_close)(abl_db *);
-    int (*c_get)(abl_db *,char **key,unsigned *ksize,char **data,unsigned *dsize);
+    int (*c_get)(abl_db *,char **key,size_t *ksize,char **data,size_t *dsize);
     void *state;
 } abl_db;
 

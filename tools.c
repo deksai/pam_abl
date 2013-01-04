@@ -183,8 +183,8 @@ static int doshow(abl_db *db, ablObjectType type) {
     const char  *rule   = NULL;
     time_t      now     = time(NULL);
     u_int32_t   bsz     = 0;
-    unsigned    ksize   = 0;
-    unsigned    dsize   = 0;
+    size_t      ksize   = 0;
+    size_t      dsize   = 0;
 
     if (!args || !db) return 0;
 
@@ -275,7 +275,7 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
     char      *key = NULL, *data = NULL, *buf = NULL;
     time_t    now = time(NULL);
     time_t    purgeTime = now;
-    unsigned  ksize = 0, dsize = 0;
+    size_t    ksize = 0, dsize = 0;
     u_int32_t bsz = 0;
 
     if (!abldb || !args)
@@ -361,8 +361,8 @@ static int doupdate(abl_db *abldb, ablObjectType type) {
     char        *data   = NULL;
     const char  *rule   = NULL;
     time_t      now     = time(NULL);
-    unsigned    ksize   = 0;
-    unsigned    dsize   = 0;
+    size_t      ksize   = 0;
+    size_t      dsize   = 0;
     u_int32_t   bsz     = 0;
 
     if (!abldb || !args)
@@ -444,8 +444,8 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
     int       del   = 0;
     char      *buf  = NULL;
     u_int32_t bsz   = 0;
-    unsigned  ksize = 0;
-    unsigned  dsize = 0;
+    size_t    ksize = 0;
+    size_t    dsize = 0;
 
     if (!abldb || !args)
         return 0;
