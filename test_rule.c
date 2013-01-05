@@ -31,7 +31,7 @@ static void testRuleNoAttempts() {
         printf("   Could not create an empty state.\n");
         return;
     }
-    if (rule_test(NULL, "*:10/1s", "user", "service", state, 10) == BLOCKED)
+    if (rule_test("*:10/1s", "user", "service", state, 10) == BLOCKED)
         printf("   No attempts should never match.\n");
 }
 
@@ -46,9 +46,9 @@ static void testEmptyRule() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "", "user", "service", state, 5) == BLOCKED)
+    if (rule_test("", "user", "service", state, 5) == BLOCKED)
         printf("   The empty rule matched.\n");
-    if (rule_test(NULL, NULL, "user", "service", state, 5) == BLOCKED)
+    if (rule_test(NULL, "user", "service", state, 5) == BLOCKED)
         printf("   The empty rule matched.\n");
 }
 
@@ -63,9 +63,9 @@ static void testNoMatch() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "*:6/10s", "user", "service", state, 10) == BLOCKED)
+    if (rule_test("*:6/10s", "user", "service", state, 10) == BLOCKED)
         printf("   The rule matched.\n");
-    if (rule_test(NULL, "*:10/8s", "user", "service", state, 10) == BLOCKED)
+    if (rule_test("*:10/8s", "user", "service", state, 10) == BLOCKED)
         printf("   The rule matched.\n");
 }
 
@@ -80,9 +80,9 @@ static void testMatch() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "*:5/10s", "user", "service", state, 10) == CLEAR)
+    if (rule_test("*:5/10s", "user", "service", state, 10) == CLEAR)
         printf("   The rule did not match.\n");
-    if (rule_test(NULL, "*:3/10s", "user", "service", state, 10) == CLEAR)
+    if (rule_test("*:3/10s", "user", "service", state, 10) == CLEAR)
         printf("   The rule did not match.\n");
 }
 
@@ -97,9 +97,9 @@ static void testMatchService() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "*/Service1:5/10s *:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
+    if (rule_test("*/Service1:5/10s *:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
         printf("   The special service rule did not match.\n");
-    if (rule_test(NULL, "*/Service1:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
+    if (rule_test("*/Service1:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
         printf("   The rule matched.\n");
 }
 
@@ -114,9 +114,9 @@ static void testNoService() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "*/Service1:5/10s *:8/1h", "MyUser", NULL, state, 10) == BLOCKED)
+    if (rule_test("*/Service1:5/10s *:8/1h", "MyUser", NULL, state, 10) == BLOCKED)
         printf("   The rule matched.\n");
-    if (rule_test(NULL, "*:5/1h", "MyUser", NULL, state, 10) == CLEAR)
+    if (rule_test("*:5/1h", "MyUser", NULL, state, 10) == CLEAR)
         printf("   The rule dit not match.\n");
 }
 
@@ -131,9 +131,9 @@ static void testMatchUser() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "MyUser:5/10s *:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
+    if (rule_test("MyUser:5/10s *:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
         printf("   The rule did not match.\n");
-    if (rule_test(NULL, "user2:1/1h *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
+    if (rule_test("user2:1/1h *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
         printf("   The rule did match.\n");
 }
 
@@ -148,9 +148,9 @@ static void testInvert() {
         if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
             printf("   Could not add an attempt.\n");
     }
-    if (rule_test(NULL, "!MyUser:1/10s *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
+    if (rule_test("!MyUser:1/10s *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
         printf("   The rule did match.\n");
-    if (rule_test(NULL, "MyUser:1/10s !MyUser:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
+    if (rule_test("MyUser:1/10s !MyUser:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
         printf("   The rule did not match.\n");
 }
 

@@ -101,48 +101,48 @@ static size_t wordlen(const char *rp) {
     return l;
 }
 
-static int match(log_context *log, const char *pattern, const char *target, size_t len) {
-    log_debug(log, "match('%s', '%s', %d)", pattern, target, len);
+static int match(const char *pattern, const char *target, size_t len) {
+    log_debug("match('%s', '%s', %d)", pattern, target, len);
     if (!pattern)
         return 0;
     return (len == strlen(pattern)) && (memcmp(pattern, target, len) == 0);
 }
 
-static int matchname(log_context *log, const char *user, const char *service,
+static int matchname(const char *user, const char *service,
                      const char **rp) {
     size_t l = wordlen(*rp);
     int ok;
 
-    log_debug(log, "Check %s/%s against %s(%d)", user, service, *rp, l);
+    log_debug("Check %s/%s against %s(%d)", user, service, *rp, l);
 
-    ok = (l != 0) && ((l == 1 && **rp == '*') || match(log, user, *rp, l));
+    ok = (l != 0) && ((l == 1 && **rp == '*') || match(user, *rp, l));
     (*rp) += l;
     if (ok) {
-        log_debug(log, "Name part matches, **rp = '%c'", **rp);
+        log_debug("Name part matches, **rp = '%c'", **rp);
     }
     if (**rp == '/') {
         (*rp)++;
         l = wordlen(*rp);
-        ok &= (l != 0) && ((l == 1 && **rp == '*') || match(log, service, *rp, l));
+        ok &= (l != 0) && ((l == 1 && **rp == '*') || match(service, *rp, l));
         (*rp) += l;
     }
 
-    log_debug(log, "%satch!", ok ? "M" : "No m");
+    log_debug("%satch!", ok ? "M" : "No m");
 
     return ok;
 }
 
-static int matchnames(log_context *log, const char *user, const char *service,
+static int matchnames(const char *user, const char *service,
                       const char **rp) {
-    int ok = matchname(log, user, service, rp);
+    int ok = matchname(user, service, rp);
     while (**rp == '|') {
         (*rp)++;
-        ok |= matchname(log, user, service, rp);
+        ok |= matchname(user, service, rp);
     }
     return ok;
 }
 
-static long howmany(log_context *log, AuthState *history, time_t now, long limit) {
+static long howmany(AuthState *history, time_t now, long limit) {
     if (firstAttempt(history))
         return -1;
     long i = 0;
@@ -151,20 +151,20 @@ static long howmany(log_context *log, AuthState *history, time_t now, long limit
         if (difftime(now, attempt.m_time) <= (double) limit)
             ++i;
     }
-    log_debug(log, "howmany(%ld) = %ld", limit, i);
+    log_debug("howmany(%ld) = %ld", limit, i);
     return i;
 }
 
-static int matchperiod(log_context *log, AuthState *history, time_t now, const char **rp) {
+static int matchperiod(AuthState *history, time_t now, const char **rp) {
     int err;
     long count, period;
 
-    log_debug(log, "matchperiod(%p, %u, '%s')", history, getNofAttempts(history), *rp);
+    log_debug("matchperiod(%p, %u, '%s')", history, getNofAttempts(history), *rp);
 
     if (err = parse_long(rp, &count), 0 != err) {
         return 0;
     }
-    log_debug(log, "count is %ld, **rp='%c'", count, **rp);
+    log_debug("count is %ld, **rp='%c'", count, **rp);
     if (**rp != '/') {
         return 0;
     }
@@ -172,25 +172,25 @@ static int matchperiod(log_context *log, AuthState *history, time_t now, const c
     if (err = parse_time(rp, &period), 0 != err) {
         return 0;
     }
-    log_debug(log, "period is %ld, **rp='%c'", period, **rp);
-    log_debug(log, "Checking %ld/%ld", count, period);
-    return howmany(log, history, now, period) >= count;
+    log_debug("period is %ld, **rp='%c'", period, **rp);
+    log_debug("Checking %ld/%ld", count, period);
+    return howmany(history, now, period) >= count;
 }
 
-int rule_matchperiods(log_context *log, AuthState *history, time_t now, const char **rp) {
-    if (matchperiod(log, history, now, rp)) {
+int rule_matchperiods(AuthState *history, time_t now, const char **rp) {
+    if (matchperiod(history, now, rp)) {
         return 1;
     }
     while (**rp == ',') {
         (*rp)++;
-        if (matchperiod(log, history, now, rp)) {
+        if (matchperiod(history, now, rp)) {
             return 1;
         }
     }
     return 0;
 }
 
-static int check_clause(log_context *log, const char **rp,
+static int check_clause(const char **rp,
                         const char *user, const char *service,
                         AuthState *history, time_t now) {
     int inv = 0;
@@ -200,11 +200,11 @@ static int check_clause(log_context *log, const char **rp,
         (*rp)++;
     }
 
-    if (!(inv ^ matchnames(log, user, service, rp))) {
+    if (!(inv ^ matchnames(user, service, rp))) {
         return 0;
     }
 
-    log_debug(log, "Name matched, next char is '%c'", **rp);
+    log_debug("Name matched, next char is '%c'", **rp);
 
     /* The name part matches so now check the trigger clauses */
     if (**rp != ':') {
@@ -212,10 +212,10 @@ static int check_clause(log_context *log, const char **rp,
     }
 
     (*rp)++;
-    return rule_matchperiods(log, history, now, rp);
+    return rule_matchperiods(history, now, rp);
 }
 
-BlockState rule_test(log_context *log, const char *rule,
+BlockState rule_test(const char *rule,
               const char *user, const char *service,
               AuthState *history, time_t now) {
     if (!rule)
@@ -223,7 +223,7 @@ BlockState rule_test(log_context *log, const char *rule,
     const char *rp = rule;
 
     while (*rp != '\0') {
-        if (check_clause(log, &rp, user, service, history, now)) {
+        if (check_clause(&rp, user, service, history, now)) {
             return BLOCKED;
         }
         while (*rp != '\0' && !isspace(*rp)) {

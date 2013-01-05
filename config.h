@@ -20,8 +20,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include "log.h"
-
 typedef struct abl_string {
     struct abl_string *link;
 } abl_string;
@@ -29,13 +27,12 @@ typedef struct abl_string {
 typedef struct {
     /* Our args */
     const char      *db_home;
-    const char      *host_db;
+    const char      *db_module;
     const char      *host_rule;
     long             host_purge;
     const char      *host_whitelist;
     const char      *host_blk_cmd;
     const char      *host_clr_cmd;
-    const char      *user_db;
     const char      *user_rule;
     long             user_purge;
     const char      *user_whitelist;
@@ -43,16 +40,18 @@ typedef struct {
     const char      *user_clr_cmd;
     unsigned int     upperlimit;
     unsigned int     lowerlimit;
+    int              debug;
     /* Storage */
     abl_string      *strs;
 } abl_args;
 
-abl_args *config_create();
-void config_free(abl_args *args);
-int config_parse_args(int argc, const char **argv, abl_args *args, log_context *logContext);
-int config_parse_file(const char *name, abl_args *args, log_context *logContext);
-void dump_args(const abl_args *args, log_context *logContext);
+abl_args *args;
 
+void config_create();
+void config_free();
+int config_parse_args(int argc, const char **argv);
+int config_parse_file(const char *name);
+void dump_args();
 /*
  * Split a command based on what's between brackets, strings not in brackets are ignored
  * \param command: the command to split.
@@ -74,5 +73,5 @@ void dump_args(const abl_args *args, log_context *logContext);
             - result[2] = "arg2"
         with as return value 3
  */
-int splitCommand(char *command, char* result[], log_context *logContext);
+int splitCommand(char *command, char* result[]);
 #endif

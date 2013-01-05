@@ -28,7 +28,7 @@
 #define HEADER_SIZE (sizeof(int)+sizeof(unsigned int))
 
 //when we allocate memory for the data, allocate this much more for future attempts
-// this will save us a realloc at the cost of this much more bytes
+// this will save us a realloc at the cost of this many more bytes
 #define SPARE_SPACE 100
 #define INCREASE_NOFATTEMPTS(state, x) ((*((unsigned int *)(((int*)(state->m_data))+1))) += x)
 #define SET_NOFATTEMPTS(state, x) ((*((unsigned int *)(((int*)(state->m_data))+1))) = x)
@@ -74,7 +74,7 @@ int createAuthState(void *data, size_t size, AuthState **state) {
     if (!retValue)
         return 1;
     memset(retValue, 0, sizeof(AuthState));
-    //allocate some bytes more then we actually need
+    //allocate more bytes than we actually need
     //this way we can probably cope with an extra attempt without reallocating
     size_t bufferSize = size + SPARE_SPACE;
     void *allocatedData = malloc(bufferSize);

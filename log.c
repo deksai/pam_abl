@@ -18,27 +18,29 @@
  */
 
 #include "log.h"
+#include <execinfo.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdio.h>
+#include <unistd.h>
 
-#include <db.h>
-
-#define MODULE_NAME "pam-abl"
+#define MODULE_NAME "pam_abl"
 
 #define UNUSED(x) (void)(x)
 
-log_context *createLogContext() {
-    log_context *retValue = malloc(sizeof(log_context));
-    retValue->debug = 0;
-    return retValue;
-}
+//XXX unused everywhere
+//log_context *createLogContext() {
+//    log_context *retValue = malloc(sizeof(log_context));
+//    retValue->debug = 0;
+//    return retValue;
+//}
 
-void destroyLogContext(log_context *context) {
-    free(context);
-}
+//void destroyLogContext(log_context *context) {
+//    free(context);
+//}
 
 static void log_out(int pri, const char *format, ...) {
     va_list ap;
@@ -56,24 +58,16 @@ static void log_out(int pri, const char *format, ...) {
 }
 
 #if !defined(TOOLS) && !defined(TEST)
-void log_pam_error(log_context *context, pam_handle_t *handle, int err, const char *what) {
-    UNUSED(context);
+void log_pam_error(pam_handle_t *handle, int err, const char *what) {
     log_out(LOG_ERR, "%s (%d) while %s", pam_strerror(handle, err), err, what);
 }
 #endif
 
-void log_sys_error(log_context *context, int err, const char *what) {
-    UNUSED(context);
+void log_sys_error(int err, const char *what) {
     log_out(LOG_ERR, "%s (%d) while %s", strerror(err), err, what);
 }
 
-void log_db_error(log_context *context, int err, const char *what) {
-    UNUSED(context);
-    log_out(LOG_ERR, "%s (%d) while %s", db_strerror(err), err, what);
-}
-
-void log_info(log_context *context, const char *format, ...) {
-    UNUSED(context);
+void log_info(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
 #if defined(TEST) || defined(TOOLS)
@@ -88,14 +82,17 @@ void log_info(log_context *context, const char *format, ...) {
     va_end(ap);
 }
 
-void log_error(log_context *context, const char *format, ...) {
-    UNUSED(context);
+void log_error(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
+
 #if defined(TEST) || defined(TOOLS)
+    //void *buffer[64];
     fprintf(stderr, "ERROR: ");
     vfprintf(stderr, format, ap);
     fprintf(stderr, "\n");
+    //backtrace(buffer,64);
+    //backtrace_symbols_fd(buffer,64,STDERR_FILENO);
 #else
     openlog(MODULE_NAME, LOG_CONS | LOG_PID, LOG_AUTHPRIV);
     vsyslog(LOG_WARNING, format, ap);
@@ -104,8 +101,7 @@ void log_error(log_context *context, const char *format, ...) {
     va_end(ap);
 }
 
-void log_warning(log_context *context, const char *format, ...) {
-    UNUSED(context);
+void log_warning(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
 #if defined(TEST) || defined(TOOLS)
@@ -120,10 +116,10 @@ void log_warning(log_context *context, const char *format, ...) {
     va_end(ap);
 }
 
-void log_debug(log_context *context, const char *format, ...) {
+void log_debug(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
-    if (context == NULL || context->debug) {
+    if (args != NULL && args->debug) {
 #if defined(TEST) || defined(TOOLS)
 #   ifndef TEST
         fprintf(stderr, "DEBUG: ");

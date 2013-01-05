@@ -18,6 +18,7 @@
  */
 
 #include "pam_abl.h"
+#include "dbfun.h"
 #include "rule.h"
 #include "config.h"
 #include <stdio.h>
@@ -27,6 +28,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <getopt.h>
+#include <dlfcn.h>
 
 #define PAD "\t"
 #define DEFAULT_CONFIG "/etc/security/pam_abl.conf"
@@ -137,7 +139,7 @@ static void reltime(long t) {
     printf(PAD PAD "%ld/%02ld:%02ld:%02ld\n", days, hours, minutes, seconds);
 }
 
-static void showblocking(const char *rule, AuthState *history, time_t now, log_context *log) {
+static void showblocking(const char *rule, AuthState *history, time_t now) {
     int op = 0;
     while (*rule) {
         const char *up;
@@ -147,7 +149,7 @@ static void showblocking(const char *rule, AuthState *history, time_t now, log_c
         }
         up = rule;
         rule = colon + 1;
-        if (rule_matchperiods(log, history, now, &rule)) {
+        if (rule_matchperiods(history, now, &rule)) {
             if (!op) {
                 printf(PAD PAD "Blocked based on rule [");
                 op = 1;
@@ -173,80 +175,57 @@ static void showblocking(const char *rule, AuthState *history, time_t now, log_c
     }
 }
 
-static int doshow(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logContext, int isHost) {
-    DB *db=NULL;
-    DBT key, data;
-    DBC *cursor;
-    int err = 0;
-    u_int32_t bsz = 0;
-    int cnt = 0;
-    char *buf = NULL;
-    char *thing = NULL;
-    const char *rule = NULL;
-    time_t now = time(NULL);
+static int doshow(abl_db *db, ablObjectType type) {
+    int         err     = 0;
+    int         cnt     = 0;
+    char        *buf    = NULL;
+    char        *thing  = NULL;
+    char        *key    = NULL;
+    char        *data   = NULL;
+    const char  *rule   = NULL;
+    time_t      now     = time(NULL);
+    u_int32_t   bsz     = 0;
+    size_t      ksize   = 0;
+    size_t      dsize   = 0;
 
-    if (args == NULL || dbEnv == NULL || dbEnv->m_environment == NULL) {
-        return 0;
-    }
-    if(isHost) {
-        db = dbEnv->m_hostDb ? dbEnv->m_hostDb->m_dbHandle : NULL;
+    if (!args || !db) return 0;
+
+    if(type && HOST) {
         thing = "hosts";
         rule = args->host_rule;
+        db->c_open(db, HOST);
     } else {
-        db = dbEnv->m_userDb ? dbEnv->m_userDb->m_dbHandle : NULL;
         thing = "users";
         rule = args->user_rule;
+        db->c_open(db, USER);
     }
-
-    //is there a db for this type?
-    if (!db)
-        return 0;
 
     //Section header for output
     printf("Failed %s:\n", thing);
 
-    memset(&key,  0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-
-    err = startTransaction(dbEnv->m_environment);
-    if (err) {
-        log_db_error(logContext, err, "starting transaction");
-        goto doshow_fail;
-    }
-    DB_TXN *tid = dbEnv->m_environment->m_transaction;
-    if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
-        log_db_error(logContext, err, "creating cursor");
-        goto doshow_fail;
-    }
-
     for (;;) {
-        err = cursor->c_get(cursor, &key, &data, DB_NEXT | DB_RMW);
-        if (DB_NOTFOUND == err) {
+        if (db->c_get(db, &key, &ksize, &data, &dsize))
             break;
-        } else if (0 != err) {
-            log_db_error(logContext, err, "iterating cursor");
-            goto doshow_fail;
-        }
 
         /* Print it out */
-        if (bsz < key.size + 1) {
+        if (bsz < ksize + 1) {
             char *nb;
-            int ns = key.size + 80;
+            int ns = ksize + 80;
             if (nb = realloc(buf, ns), NULL == nb) {
-                log_sys_error(logContext, ENOMEM, "displaying item");
+                log_sys_error(ENOMEM, "displaying item");
                 goto doshow_fail;
             }
             buf = nb;
             bsz = ns;
         }
         AuthState *state = NULL;
-        err = createAuthState(data.data, data.size, &state);
+        err = createAuthState(data, dsize, &state);
         if (err) {
-            log_error(logContext, "Could not parse the attempts in the database.");
+            log_error("Could not parse the attempts in the database.");
             goto doshow_fail;
         }
-        memcpy(buf, key.data, key.size);
-        buf[key.size] = '\0';
+        memcpy(buf, key, ksize);
+        buf[ksize] = '\0';
         printf(PAD "%s (%u)\n", buf, getNofAttempts(state));
         cnt++;
 
@@ -277,7 +256,7 @@ static int doshow(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logCont
                 }
             }
         } else if (NULL != rule) {
-            showblocking(rule, state, now, logContext);
+            showblocking(rule, state, now);
         }
         destroyAuthState(state);
     }
@@ -288,226 +267,152 @@ static int doshow(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logCont
 
     /* Cleanup */
 doshow_fail:
-#if DB_VERSION_MAJOR < 5
-    if (cursor != NULL)
-        cursor->c_close(cursor);
-#else
-    if (cursor != NULL)
-        cursor->close(cursor);
-#endif
-    commitTransaction(dbEnv->m_environment);
+    db->c_close(db);
     free(buf);
     return err;
 }
 
-static int dopurge(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logContext, int isHost) {
-    DB *db = NULL;
-    DBT key, data;
-    DBC *cursor;
-    DB_TXN *tid = NULL;
-    int err;
-    time_t now = time(NULL);
-    time_t purgeTime = now;
-    char *buf = NULL;
+static int dopurge(abl_db *abldb, ablObjectType type) {
+    int       err;
+    char      *key = NULL, *data = NULL, *buf = NULL;
+    time_t    now = time(NULL);
+    time_t    purgeTime = now;
+    size_t    ksize = 0, dsize = 0;
     u_int32_t bsz = 0;
 
-    if (!args || !dbEnv)
-        return 1;
+    if (!abldb || !args)
+        return 1; 
 
-    if(isHost) {
-        db = dbEnv->m_hostDb ? dbEnv->m_hostDb->m_dbHandle : NULL;
+    if(type && HOST) {
         purgeTime = now - args->host_purge;
     } else {
-        db = dbEnv->m_userDb ? dbEnv->m_userDb->m_dbHandle : NULL;
         purgeTime = now - args->user_purge;
     }
 
-    if (!db)
-        return 0; //db was not opened, perhaps not specified in config => do nothing
-
-    //Cheat, because get_dbname is broken starting on some version lower than 4.8
-    mention("Purging %s", db->fname);
-
-    memset(&key,  0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-
-    err = startTransaction(dbEnv->m_environment);
-    if (err) {
-        log_db_error(logContext, err, "starting transaction");
-        goto dopurge_fail;
-    }
-    tid = dbEnv->m_environment->m_transaction;
-    if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
-        log_db_error(logContext, err, "creating cursor");
+    mention("Purging");
+    if (err = abldb->c_open(abldb, type), 0 != err) {
         goto dopurge_fail;
     }
 
     for (;;) {
-        err = cursor->c_get(cursor, &key, &data, DB_NEXT | DB_RMW);
-        if (DB_NOTFOUND == err) {
-            err = 0; //not really an error, just at the end
+        err = abldb->c_get(abldb, &key, &ksize, &data, &dsize);
+        if (err) 
             break;
-        } else if (0 != err) {
-            log_db_error(logContext, err, "iterating cursor");
-            goto dopurge_fail;
-        }
 
-        AuthState *state = NULL;
-        err = createAuthState(data.data, data.size, &state);
+        AuthState *authstate = NULL;
+        err = createAuthState(data, dsize, &authstate);
         if (err) {
-            log_error(logContext, "Could not parse the attempts in the database.");
+            log_error("Could not parse the attempts in the database.");
             goto dopurge_fail;
         }
-        purgeAuthState(state, purgeTime);
-        if (getNofAttempts(state) == 0) {
-            err = cursor->c_del(cursor, 0);
+        purgeAuthState(authstate, purgeTime);
+        if (getNofAttempts(authstate) == 0) {
+            err = abldb->del(abldb, key, type);
             if (err) {
-                destroyAuthState(state);
+                destroyAuthState(authstate);
                 goto dopurge_fail;
             }
-            if (getState(state) != CLEAR) {
-                if (bsz < key.size + 1) {
+            if (getState(authstate) != CLEAR) {
+                if (bsz < ksize + 1) {
                     char *nb;
-                    int ns = key.size + 80;
+                    int ns = ksize + 80;
                     if (nb = realloc(buf, ns), NULL == nb) {
                         err = 1;
-                        log_sys_error(logContext, ENOMEM, "white listing items");
+                        log_sys_error(ENOMEM, "white listing items");
                         goto dopurge_fail;
                     }
                     buf = nb;
                     bsz = ns;
                 }
-                memcpy(buf, key.data, key.size);
-                buf[key.size] = '\0';
+                memcpy(buf, key, ksize);
+                buf[ksize] = '\0';
                 abl_info info;
                 info.blockReason = CLEAR;
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;
-                if (isHost) {
+                if (type && HOST) {
                     info.host = &buf[0];
-                    runHostCommand(CLEAR, args, &info, logContext);
+                    runHostCommand(CLEAR, &info);
                 } else {
                     info.user = &buf[0];
-                    runUserCommand(CLEAR, args, &info, logContext);
+                    runUserCommand(CLEAR, &info);
                 }
             }
         } else {
-            DBT newData;
-            memset(&newData, 0, sizeof(newData));
-            newData.data = state->m_data;
-            newData.size = state->m_usedSize;
-            err = cursor->c_put(cursor, &key, &newData, DB_CURRENT);
+            //err = cursor->c_put(cursor, &key, &newData, DB_CURRENT);
+            err = abldb->put(abldb, key, authstate, type);
             if (err) {
-                log_db_error(logContext, err, "saving purged result.");
                 goto dopurge_fail;
             }
         }
-        destroyAuthState(state);
+        destroyAuthState(authstate);
     }
 
     // Cleanup
 dopurge_fail:
     free(buf);
-#if DB_VERSION_MAJOR < 5
-    if (cursor)
-        cursor->c_close(cursor);
-#else
-    if (cursor)
-        cursor->close(cursor);
-#endif
-
-    if (tid) {
-        if (err)
-            abortTransaction(dbEnv->m_environment);
-        else
-            commitTransaction(dbEnv->m_environment);
-    }
+    abldb->c_close(abldb);
     return err;
 }
 
-static int doupdate(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logContext, int isHost) {
-    DB *db = NULL;
-    DBT key, data;
-    DBC *cursor;
-    DB_TXN *tid = NULL;
-    int err;
-    time_t now = time(NULL);
-    char *buf = NULL;
-    const char *rule = NULL;
-    u_int32_t bsz = 0;
+static int doupdate(abl_db *abldb, ablObjectType type) {
+    int         err;
+    char        *buf    = NULL;
+    char        *key    = NULL;
+    char        *data   = NULL;
+    const char  *rule   = NULL;
+    time_t      now     = time(NULL);
+    size_t      ksize   = 0;
+    size_t      dsize   = 0;
+    u_int32_t   bsz     = 0;
 
-    if (!args || !dbEnv)
+    if (!abldb || !args)
         return 1;
 
-    if(isHost) {
-        db = dbEnv->m_hostDb ? dbEnv->m_hostDb->m_dbHandle : NULL;
+    if(type && HOST) {
         rule = args->host_rule;
     } else {
-        db = dbEnv->m_userDb ? dbEnv->m_userDb->m_dbHandle : NULL;
         rule = args->user_rule;
     }
 
-    if (!db)
-        return 0; //db was not opened, perhaps not specified in config => do nothing
-
-    memset(&key,  0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-
-    err = startTransaction(dbEnv->m_environment);
-    if (err) {
-        log_db_error(logContext, err, "starting transaction");
-        goto doupdate_fail;
-    }
-    tid = dbEnv->m_environment->m_transaction;
-    if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
-        log_db_error(logContext, err, "creating cursor");
+    if (err = abldb->c_open(abldb, type), 0 != err) {
         goto doupdate_fail;
     }
 
     for (;;) {
-        err = cursor->c_get(cursor, &key, &data, DB_NEXT | DB_RMW);
-        if (DB_NOTFOUND == err) {
-            err = 0; //not really an error, just at the end
+        err = abldb->c_get(abldb, &key, &ksize, &data, &dsize);
+        if (err) 
             break;
-        } else if (0 != err) {
-            log_db_error(logContext, err, "iterating cursor");
-            goto doupdate_fail;
-        }
 
-        AuthState *state = NULL;
-        err = createAuthState(data.data, data.size, &state);
+        AuthState *authstate = NULL;
+        err = createAuthState(data, dsize, &authstate);
         if (err) {
-            log_error(logContext, "Could not parse the attempts in the database.");
+            log_error("Could not parse the attempts in the database.");
             goto doupdate_fail;
         }
-        if (bsz < key.size + 1) {
+        if (bsz < ksize + 1) {
             char *nb;
-            int ns = key.size + 80;
+            int ns = ksize + 80;
             if (nb = realloc(buf, ns), NULL == nb) {
                 err = 1;
-                log_sys_error(logContext, ENOMEM, "white updating items");
+                log_sys_error(ENOMEM, "white updating items");
                 goto doupdate_fail;
             }
             buf = nb;
             bsz = ns;
         }
-        memcpy(buf, key.data, key.size);
-        buf[key.size] = '\0';
-        BlockState updatedState = rule_test(logContext, rule, &buf[0], NULL, state, now);
+        memcpy(buf, key, ksize);
+        buf[ksize] = '\0';
+        BlockState updatedState = rule_test(rule, &buf[0], NULL, authstate, now);
         //is the state changed
-        if (updatedState != getState(state)) {
+        if (updatedState != getState(authstate)) {
             //update the BlockState in the subjectState
-            if (setState(state, updatedState)) {
-                log_error(logContext, "The state could not be updated.");
+            if (setState(authstate, updatedState)) {
+                log_error("The state could not be updated.");
             } else {
-                DBT newData;
-                memset(&newData, 0, sizeof(newData));
-                newData.data = state->m_data;
-                newData.size = state->m_usedSize;
-                err = cursor->c_put(cursor, &key, &newData, DB_CURRENT);
+                err = abldb->put(abldb, key, authstate, type);
                 if (err) {
-                    log_db_error(logContext, err, "saving purged result.");
                     goto doupdate_fail;
                 }
                 abl_info info;
@@ -515,133 +420,97 @@ static int doupdate(const abl_args *args, PamAblDbEnv *dbEnv, log_context *logCo
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;
-                if (isHost) {
+                if (type && HOST) {
                     info.host = &buf[0];
-                    runHostCommand(updatedState, args, &info, logContext);
+                    runHostCommand(updatedState, &info);
                 } else {
                     info.user = &buf[0];
-                    runUserCommand(updatedState, args, &info, logContext);
+                    runUserCommand(updatedState, &info);
                 }
             }
         }
-        destroyAuthState(state);
+        destroyAuthState(authstate);
     }
 
     // Cleanup
 doupdate_fail:
     free(buf);
-#if DB_VERSION_MAJOR < 5
-    if (cursor)
-        cursor->c_close(cursor);
-#else
-    if (cursor)
-        cursor->close(cursor);
-#endif
-
-    if (tid) {
-        if (err)
-            abortTransaction(dbEnv->m_environment);
-        else
-            commitTransaction(dbEnv->m_environment);
-    }
+    abldb->c_close(abldb);
     return err;
 }
 
-static int whitelist(const abl_args *args, PamAblDbEnv *dbEnv, int isHost, const char **permit, int count, log_context *logContext) {
-    DB *db = NULL;
-    int err = 0;
-    DBT key, data;
-    DBC *cursor = NULL;
-    DB_TXN *tid = NULL;
-    int del = 0;
-    char *buf = NULL;
-    u_int32_t bsz = 0;
+static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int count) {
+    int       err   = 0;
+    char      *key  = NULL;
+    char      *data = NULL;
+    int       del   = 0;
+    char      *buf  = NULL;
+    u_int32_t bsz   = 0;
+    size_t    ksize = 0;
+    size_t    dsize = 0;
 
-    if (args == NULL || !dbEnv || !dbEnv->m_environment)
+    if (!abldb || !args)
         return 0;
 
-    if (isHost)
-        db = dbEnv->m_hostDb ? dbEnv->m_hostDb->m_dbHandle : NULL;
-    else
-        db = dbEnv->m_userDb ? dbEnv->m_userDb->m_dbHandle : NULL;
-
-    if (!db)
-        return 0;
-
-    memset(&key,  0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-
-    if (startTransaction(dbEnv->m_environment)) {
-        log_db_error(logContext, err, "starting transaction");
-        goto whitelist_fail;
-    }
-    tid = dbEnv->m_environment->m_transaction;
-
-    if (err = db->cursor(db, tid, &cursor, 0), 0 != err) {
-        log_db_error(logContext, err, "creating cursor");
+    if (err = abldb->c_open(abldb, type), 0 != err) {
         goto whitelist_fail;
     }
 
     for (;;) {
-        err = cursor->c_get(cursor, &key, &data, DB_NEXT | DB_RMW);
-        if (DB_NOTFOUND == err) {
-            //this is not actually an error
-            err = 0;
+        err = abldb->c_get(abldb, &key, &ksize, &data, &dsize);
+        if (err) {
             break;
-        } else if (err) {
-            log_db_error(logContext, err, "iterating cursor");
-            goto whitelist_fail;
-        }
+        } 
 
         int n;
         int match = 0;
         for (n = 0; n < count; n++) {
-            if (wildmatch(permit[n], (const char *) key.data, (const char *) key.data + key.size)) {
+            if (wildmatch(permit[n], key, key + ksize)) {
                 match = 1;
                 break;
             }
         }
 
         if (match) {
-            AuthState *state = NULL;
-            err = createAuthState(data.data, data.size, &state);
+            AuthState *authstate = NULL;
+            err = createAuthState(data, dsize, &authstate);
             if (err) {
-                log_error(logContext, "Could not parse a attempts in the database.");
+                log_error("Could not parse a attempts in the database.");
                 continue;
             }
-            err = cursor->c_del(cursor, 0);
+            err = abldb->del(abldb, key, type);
             if (err) {
                 goto whitelist_fail;
             }
-            if (getState(state) != CLEAR) {
-                if (bsz < key.size + 1) {
+            if (getState(authstate) != CLEAR) {
+                if (bsz < ksize + 1) {
                     char *nb;
-                    int ns = key.size + 80;
+                    int ns = ksize + 80;
                     if (nb = realloc(buf, ns), NULL == nb) {
                         err = 1;
-                        log_sys_error(logContext, ENOMEM, "white listing items");
+                        log_sys_error(ENOMEM, "white listing items");
                         goto whitelist_fail;
                     }
                     buf = nb;
                     bsz = ns;
                 }
-                memcpy(buf, key.data, key.size);
-                buf[key.size] = '\0';
+                memcpy(buf, key, ksize);
+                buf[ksize] = '\0';
                 abl_info info;
                 info.blockReason = CLEAR;
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;
-                if (isHost) {
+                if (type && HOST) {
                     info.host = &buf[0];
-                    runHostCommand(CLEAR, args, &info, logContext);
+                    runHostCommand(CLEAR, &info);
                 } else {
                     info.user = &buf[0];
-                    runUserCommand(CLEAR, args, &info, logContext);
+                    runUserCommand(CLEAR, &info);
                 }
             }
             ++del;
-            destroyAuthState(state);
+            destroyAuthState(authstate);
         }
     }
 
@@ -651,33 +520,21 @@ static int whitelist(const abl_args *args, PamAblDbEnv *dbEnv, int isHost, const
     // Cleanup
 whitelist_fail:
     free(buf);
-#if DB_VERSION_MAJOR < 5
-    if (cursor != NULL)
-        cursor->c_close(cursor);
-#else
-    if (cursor != NULL)
-        cursor->close(cursor);
-#endif
-    if (tid) {
-        if (err)
-            abortTransaction(dbEnv->m_environment);
-        else
-            commitTransaction(dbEnv->m_environment);
-    }
+    abldb->c_close(abldb);
     return err;
 }
 
-static int fail(const PamAblDbEnv *dbEnv, const abl_args *args, abl_info *info, log_context *logContext) {
-    if (args == NULL || info == NULL || dbEnv == NULL)
+static int fail(const abl_db *abldb, abl_info *info) {
+    if (args == NULL || info == NULL || abldb == NULL)
         return 0;
 
-    int err = record_attempt(dbEnv, args, info, logContext);
+    int err = record_attempt(abldb, info);
     if (!err)
-        check_attempt(dbEnv, args, info, logContext);
+        check_attempt(abldb, info);
     return err;
 }
 
-static void printParsedCommand(const char *commandName, const char *origCommand, log_context *logContext) {
+static void printParsedCommand(const char *commandName, const char *origCommand) {
     char *commandCopy = NULL;
     char** result = NULL;
     int argNum = 0;
@@ -687,10 +544,10 @@ static void printParsedCommand(const char *commandName, const char *origCommand,
     }
     commandCopy = strdup(origCommand);
     if (!commandCopy) {
-        log_error(logContext, "Could not duplicate string. Out of memory?");
+        log_error("Could not duplicate string. Out of memory?");
         goto cleanup;
     }
-    argNum = splitCommand(commandCopy, NULL, logContext);
+    argNum = splitCommand(commandCopy, NULL);
     //no real command
     if (argNum == 0) {
         printf("%s: Parsing resulted in no command to run.\n", commandName);
@@ -703,7 +560,7 @@ static void printParsedCommand(const char *commandName, const char *origCommand,
 
     result = malloc((argNum+1) * sizeof(char*));
     memset(result, 0, (argNum+1) * sizeof(char*));
-    argNum = splitCommand(commandCopy, result, logContext);
+    argNum = splitCommand(commandCopy, result);
 
     int ix = 0;
     printf("%s: ", commandName);
@@ -725,14 +582,13 @@ int main(int argc, char **argv) {
     int n, c;
     char *conf = NULL;
     char *service = "none";
-    PamAblDbEnv *dbEnv = NULL;
-    BlockReason bReason = AUTH_FAILED;
-    abl_args *args = config_create();
+    abl_db   *abldb = NULL;
+    config_create();
     abl_info info;
-    log_context *logContext = createLogContext();
+    BlockReason bReason = AUTH_FAILED;
 
     if (!args) {
-        log_error(logContext, "Failed to allocate memory.");
+        log_error("Failed to allocate memory.");
         return 1;
     }
 
@@ -806,7 +662,7 @@ int main(int argc, char **argv) {
                 } else if (strcmp("AUTH", optarg) == 0) {
                     bReason = AUTH_FAILED;
                 } else {
-                    log_error(logContext, "No valid block reason given, defaulting to AUTH.");
+                    log_error("No valid block reason given, defaulting to AUTH.");
                 }
                 break;
             case '?':
@@ -827,106 +683,116 @@ int main(int argc, char **argv) {
     }
 
     mention("Reading config from %s", conf);
-    if (err = config_parse_file(conf, args, logContext), 0 != err) {
+    if (err = config_parse_file(conf), 0 != err) {
         return err;
     }
 
     if (command == DEBUGCOMMAND) {
-        printParsedCommand("host_block_cmd", args->host_blk_cmd, logContext);
-        printParsedCommand("host_clear_cmd", args->host_clr_cmd, logContext);
-        printParsedCommand("user_block_cmd", args->user_blk_cmd, logContext);
-        printParsedCommand("user_clear_cmd", args->user_clr_cmd, logContext);
+        printParsedCommand("host_block_cmd", args->host_blk_cmd);
+        printParsedCommand("host_clear_cmd", args->host_clr_cmd);
+        printParsedCommand("user_block_cmd", args->user_blk_cmd);
+        printParsedCommand("user_clear_cmd", args->user_clr_cmd);
         err = 0;
         goto main_done;
     }
 
-    if (NULL == args->user_db) {
-        mention("No user_db in %s", conf);
+    if (NULL == args->db_module) {
+        log_error("No db_module in %s", conf);
+        goto main_done;
     }
 
-    if (NULL == args->host_db) {
-        mention("No host_db in %s", conf);
+    if (NULL == args->db_home) {
+        log_error("No db_home in %s", conf);
+        goto main_done;
     }
-    dump_args(args, logContext);
+    dump_args();
 
     for(n=0;n<num_users;n++){
-        log_debug(logContext, "user: %s",users[n]);
+        log_debug("user: %s",users[n]);
     }
     for(n=0;n<num_hosts;n++){
-        log_debug(logContext,"host: %s",hosts[n]);
+        log_debug("host: %s",hosts[n]);
     }
     memset(&info, 0, sizeof(abl_info));
 
     /* Most everything should be set, and it should be safe to open the
      * databases. */
-    dbEnv = openPamAblDbEnvironment(args, logContext);
-    if (!dbEnv) {
+    void *dblib = NULL;
+    abl_db *(*db_open)();
+
+    dblib = dlopen(args->db_module, RTLD_LAZY);
+    if (!dblib) {
+        log_error("%s opening database module",dlerror());
+        goto main_done;
+    }
+    dlerror();
+    db_open = dlsym(dblib, "abl_db_open");
+    abldb = db_open();
+    if (!abldb) {
         return 1;
     }
 
     if (command == WHITELIST) {
         if (num_users > 0)
-            whitelist(args, dbEnv, 0, users, num_users, logContext);
+            whitelist(abldb, 0, users, num_users);
         if (num_hosts > 0)
-            whitelist(args, dbEnv, 1, hosts, num_hosts, logContext);
+            whitelist(abldb, 1, hosts, num_hosts);
         if (num_users == 0 && num_hosts == 0) {
-            log_error(logContext, "Asked to whitelist but no hosts or users given!");
+            log_error("Asked to whitelist but no hosts or users given!");
             err = 1;
             goto main_done;
         }
     } else if (command == FAIL) {
         if (num_users == 0 && num_hosts == 0) {
-            log_error(logContext, "Asked to fail someone, but no hosts or users given!");
+            log_error("Asked to fail someone, but no hosts or users given!");
             err = 1;
             goto main_done;
         }
         if (num_users > 1 || num_hosts > 1) {
-            log_warning(logContext, "Multiple hosts and/or users given, only the first will be used!");
+            log_warning("Multiple hosts and/or users given, only the first will be used!");
         }
         info.service = service;
         info.blockReason = bReason;
         info.user = num_users > 0 ? users[0] : NULL;
         info.host = num_hosts > 0 ? hosts[0] : NULL;
-        fail(dbEnv, args, &info, logContext);
+        fail(abldb, &info);
     } else if (command == CHECK) {
         if (num_users == 0 && num_hosts == 0) {
-            log_error(logContext, "Asked to check but no hosts or users given!");
+            log_error("Asked to check but no hosts or users given!");
             err = 1;
             goto main_done;
         }
         if (num_hosts > 1) {
-            log_warning(logContext, "More than one host specified.  Only the first one will be used!");
+            log_warning("More than one host specified.  Only the first one will be used!");
         }
         if (num_users > 1) {
-            log_warning(logContext, "More than one user specified.  Only the first one will be used!");
+            log_warning("More than one user specified.  Only the first one will be used!");
         }
 
         info.service = service;
         info.host = num_hosts > 0 ? hosts[0] : NULL;
         info.user = num_users > 0 ? users[0] : NULL;
-        BlockState bState = check_attempt(dbEnv, args, &info, logContext);
+        BlockState bState = check_attempt(abldb, &info);
         if (bState == BLOCKED)
             err = 1;
         else
             err = 0;
         goto main_done;
     } else if (command == UPDATE) {
-        doupdate(args, dbEnv, logContext, 0);
-        doupdate(args, dbEnv, logContext, 1);
+        doupdate(abldb, 0);
+        doupdate(abldb, 1);
     } else if (command == PURGE) {
-        dopurge(args, dbEnv, logContext, 0);
-        dopurge(args, dbEnv, logContext, 1);
+        dopurge(abldb, 0);
+        dopurge(abldb, 1);
     } else if (num_users == 0 && num_hosts == 0) {
-        doshow(args, dbEnv, logContext, 0);
-        doshow(args, dbEnv, logContext, 1);
+        doshow(abldb, 0);
+        doshow(abldb, 1);
     }
 
 main_done:
-    if (dbEnv)
-        destroyPamAblDbEnvironment(dbEnv);
+    if (abldb)
+        abldb->close(abldb);
     if (args)
-        config_free(args);
-    if (logContext)
-        destroyLogContext(logContext);
+        config_free();
     return err;
 }

@@ -1,0 +1,318 @@
+'\" t
+.\"     Title: pam_abl
+.\"    Author: Chris Tasma
+.\" Generator: DocBook XSL Stylesheets v1.77.1 <http://docbook.sf.net/>
+.\"      Date: 10/29/2012
+.\"    Manual: Linux-PAM Manual
+.\"    Source: GNU
+.\"  Language: English
+.\"
+.TH "PAM_ABL" "8" "10/29/2012" "GNU" "Linux\-PAM Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+pam_abl \- PAM Auto Blacklist Module
+.SH "SYNOPSIS"
+.sp
+Provides auto blacklisting of hosts and users responsible for repeated failed authentication attempts\&. Generally configured so that blacklisted users still see normal login prompts but are guaranteed to fail to authenticate\&.
+.sp
+This functionality is only available to services which call PAM as root\&. If pam_abl is called for uid != 0 it will silently succeed\&.
+.SH "DESCRIPTION"
+.sp
+Brute force password discovery attacks involve repeated attempts to authenticate against a service using a dictionary of common passwords\&. While it is desirable to enforce strong passwords for users this is not always possible and in cases where a weak password has been used brute force attacks can be effective\&.
+.sp
+The pam_abl module monitors failed authentication attempts and automatically blacklists those hosts (and accounts) that are responsible for large numbers of failed attempts\&. Once a host is blacklisted it is guaranteed to fail authentication even if the correct credentials are provided\&.
+.sp
+Blacklisting is triggered when the number of failed authentication attempts in a particular period of time exceeds a predefined limit\&. Hosts which stop attempting to authenticate will, after a period of time, be un\-blacklisted\&.
+.sp
+Commands can be specified which will be run when a host or user switches state from being blocked to clear or clear to blocked\&. See below or the pam_abl\&.conf(5) manpage for the details\&.
+.sp
+If pam_abl is called for uid != 0 it will silently succeed\&. If this was not the case it would be possible for a malicious local user to poison the pam_abl data by, for example, discovering the names of the hosts from which root typically logs in and then constructing PAM authentication code to lock out root login attempts from those hosts\&.
+.SH "OPTIONS"
+.TS
+tab(:);
+ltB ltB ltB.
+T{
+\fIName\fR
+T}:T{
+\fIArguments\fR
+T}:T{
+\fIDescription\fR
+T}
+.T&
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt.
+T{
+.sp
+\fBdebug\fR
+T}:T{
+.sp
+None
+T}:T{
+.sp
+Enable debug output to syslog\&.
+T}
+T{
+.sp
+\fBexpose_account\fR
+T}:T{
+.sp
+None
+T}:T{
+.sp
+Ignored
+T}
+T{
+.sp
+\fBno_warn\fR
+T}:T{
+.sp
+None
+T}:T{
+.sp
+Disable warnings which are otherwise output to syslog\&. try_first_pass None Ignored
+T}
+T{
+.sp
+\fBuse_first_pass\fR
+T}:T{
+.sp
+None
+T}:T{
+.sp
+Ignored
+T}
+T{
+.sp
+\fBuse_mapped_pass\fR
+T}:T{
+.sp
+None
+T}:T{
+.sp
+Ignored
+T}
+T{
+.sp
+\fBconfig\fR
+T}:T{
+.sp
+Path to the configuration file\&.
+T}:T{
+.sp
+The configuration file contains additional arguments\&. In order for the pam_abl command line tool to work correctly most of the configuration should be placed in the config file rather than being provided by arguments\&. The format of the config file is described below\&.
+T}
+T{
+.sp
+\fBlimits\fR
+T}:T{
+.sp
+Minimum and maximum number of attempts to keep\&.
+T}:T{
+.sp
+It\(cqs value should have the following syntax "<minimum>\-<maximum>"\&. If you do not block machines that do too many attempts, the db can easily become bloated\&. To prevent this we introduced this setting\&. As soon as there are a <maximum> number of attempts for a user/host, the number of stored attempts is reduced to <minimum>\&. A <maximum> of 0 means no limits\&. Make sure that <minimum> is larger then any rule specified\&. We recommend a value of "1000\-1200"\&.
+T}
+T{
+.sp
+\fBdb_home\fR
+T}:T{
+.sp
+Directory for db locking and logging files\&.
+T}:T{
+.sp
+Path to a directory where Berkeley DB can place it\(cqs locking and logging files\&. Make sure this dir is writable\&.
+T}
+T{
+.sp
+\fBhost_db\fR
+T}:T{
+.sp
+Path to host database file\&.
+T}:T{
+.sp
+Path to the Berkeley DB which is used to log the host responsible for failed authentication attempts\&.
+T}
+T{
+.sp
+\fBhost_purge\fR
+T}:T{
+.sp
+Purge time for the host database\&.
+T}:T{
+.sp
+Defines how long failed hosts are retained in the host database\&. Defaults to 1 day\&.
+T}
+T{
+.sp
+\fBhost_rule\fR
+T}:T{
+.sp
+Rule for host blacklisting\&.
+T}:T{
+.sp
+The rule (see below for format) which defines the conditions under which a failed hosts will be blackisted\&.
+T}
+T{
+.sp
+\fBhost_whitelist\fR
+T}:T{
+.sp
+Host that do not need to be tracked\&.
+T}:T{
+.sp
+;\-seperated list of host that do not need to be tracked\&. You can specify single IP addresses here or use subnets\&. For example 1\&.1\&.1\&.1 or 1\&.1\&.1\&.1/24
+T}
+T{
+.sp
+\fBhost_blk_cmd\fR
+T}:T{
+.sp
+Host block command
+T}:T{
+.sp
+Command that should be run when a host is checked, and is currently blocked\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+T}
+T{
+.sp
+\fBhost_clr_cmd\fR
+T}:T{
+.sp
+Host block command
+T}:T{
+.sp
+Command that should be run when a host is checked, and is currently clear\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+T}
+T{
+.sp
+\fBuser_db\fR
+T}:T{
+.sp
+Path to user database file\&.
+T}:T{
+.sp
+Path to the Berkeley DB which is used to log the user responsible for failed authentication attempts\&.
+T}
+T{
+.sp
+\fBuser_purge\fR
+T}:T{
+.sp
+Purge time for the user database\&.
+T}:T{
+.sp
+Defines how long failed users are retained in the user database\&. Defaults to 1 day\&.
+T}
+T{
+.sp
+\fBuser_rule\fR
+T}:T{
+.sp
+Rule for user blacklisting\&.
+T}:T{
+.sp
+The rule (see below for format) which defines the conditions under which a failed users will be blackisted\&.
+T}
+T{
+.sp
+\fBuser_whitelist\fR
+T}:T{
+.sp
+Users that do not need to be tracked\&.
+T}:T{
+.sp
+;\-seperated list of users whose attempts do not need to be recorded\&. This does not prevent the machine they are using from being blocked\&.
+T}
+T{
+.sp
+\fBuser_blk_cmd\fR
+T}:T{
+.sp
+Host block command
+T}:T{
+.sp
+Command that should be run when a user is checked, and is currently blocked\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+T}
+T{
+.sp
+\fBuser_clr_cmd\fR
+T}:T{
+.sp
+Host block command
+T}:T{
+.sp
+Command that should be run when a user is checked, and is currently clear\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+T}
+.TE
+.sp 1
+.SH "USAGE"
+.sp
+Typically pam_abl\&.so is added to the auth stack as a required module just before whatever modules actually peform authentication\&. Here\(cqs a fragment of the PAM config for a production server that is running pam_abl:
+.sp
+auth required /lib/security/pam_env\&.so auth required /lib/security/pam_abl\&.so config=/etc/security/pam_abl\&.conf auth sufficient /lib/security/pam_unix\&.so likeauth nullok auth required /lib/security/pam_deny\&.so
+.sp
+Although all of accepted arguments can be supplied here they will usually be placed in a separate config file and linked to using the config argument as in the above example\&. The pam_abl command line tool reads the external config file (/etc/security/pam_abl\&.conf in this case) to find the databases so in order for it work correctly an external config should be used\&.
+.SH "EXAMPLES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+auth required /lib/security/pam_env\&.so
+auth required /lib/security/pam_abl\&.so config=/etc/security/pam_abl\&.conf
+auth sufficient /lib/security/pam_unix\&.so likeauth nullok
+auth required /lib/security/pam_deny\&.so
+.fi
+.if n \{\
+.RE
+.\}
+.SH "SEE ALSO"
+.sp
+pam_abl\&.conf(5), pam_abl(1)
+.SH "AUTHORS"
+.sp
+Lode Mertens <pam\-abl@danta\&.be>
+.sp
+Andy Armstrong <andy@hexten\&.net>
+.sp
+Chris Tasma <pam\-abl@deksai\&.com>
+.SH "AUTHOR"
+.PP
+\fBChris Tasma\fR
+.RS 4
+Author.
+.RE

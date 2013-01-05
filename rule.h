@@ -43,13 +43,12 @@ int rule_parse_time(const char *p, long *t, long min);
 
 /*
   Tries to match a comma seperated list of '<count>/<time>' rules with the given list of attempts
-  \param log The log context to use for errors/warnings/...
   \param history The list of attempts
   \param now The time to use when matching attempts
   \param rp The string with the rule, rp will point to the first char after a clause
   \return zero when there is an error or no match, non zero otherwise
 */
-int rule_matchperiods(log_context *log, AuthState *history, time_t now, const char **rp);
+int rule_matchperiods(AuthState *history, time_t now, const char **rp);
 
 /* Apply a rule to a history record returning BLOCKED if the rule matches, CLEAR if the rule fails.
  *
@@ -84,8 +83,7 @@ int rule_matchperiods(log_context *log, AuthState *history, time_t now, const ch
  * or more events in the last minute or 100 or more events in the last day. For
  * 'root' trigger if there were ten or more events in the last three minutes.
  */
-BlockState rule_test(log_context *log, const char *rule,
-              const char *user, const char *service,
+BlockState rule_test(const char *rule, const char *user, const char *service,
               AuthState *history, time_t now);
 
 #endif

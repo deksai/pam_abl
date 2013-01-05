@@ -1,0 +1,245 @@
+'\" t
+.\"     Title: pam_abl.conf
+.\"    Author: Chris Tasma
+.\" Generator: DocBook XSL Stylesheets v1.77.1 <http://docbook.sf.net/>
+.\"      Date: 10/29/2012
+.\"    Manual: Linux-PAM Manual
+.\"    Source: GNU
+.\"  Language: English
+.\"
+.TH "PAM_ABL\&.CONF" "5" "10/29/2012" "GNU" "Linux\-PAM Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+pam_abl.conf \- Configuration file for pam_abl PAM module\&.
+.SH "SYNOPSIS"
+.sp
+Configuration file for both the pam_abl(8) PAM module, and the pam_abl(1) command line tool\&.
+.SH "DESCRIPTION"
+.SS "Syntax"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+word        ::= /[^\es\e|\e/\e*]+/
+name        ::= word | \*(Aq*\*(Aq
+username    ::= name
+servicename ::= name
+userservice ::= username
+            |   username \*(Aq/\*(Aq servicename
+namelist    ::= userservice
+            |   userservice \*(Aq|\*(Aq namelist
+userspec    ::= namelist
+            |   \*(Aq!\*(Aq namelist
+multiplier  ::= \*(Aqs\*(Aq | \*(Aqm\*(Aq | \*(Aqh\*(Aq | \*(Aqd\*(Aq
+number      ::= /\ed+/
+period      ::= number
+            |   number multiplier
+trigger     ::= number \*(Aq/\*(Aq period
+triglist    ::= trigger
+            |   trigger \*(Aq,\*(Aq triglist
+userclause  ::= userspec \*(Aq:\*(Aq triglist
+rule        ::= userclause
+            |   userclause /\es+/ rule
+.fi
+.if n \{\
+.RE
+.\}
+.SS "Rule syntax"
+.sp
+Each rule consists of a number of space separated \fIuser clauses\fR\&. A user clause specifies the user (and service) names to match and a set of triggers\&. A simple example would be
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+*:10/1h
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+which means \fIblock any user (\fR\fI\fB) if they are responsible for ten or more failed authentication attempts in the last hour\fR\fR\fI\&. In place of the \fR\fI\fR which matches any user a list of usernames can be supplied like this
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+root|dba|admin:10/1h
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+which means \fIblock the users root, dba and admin if they are responsible for ten or more failed authentication attempts in the last hour\fR\&. You can also specify a service name to match against like this
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+root/sshd|dba/*:3/1d
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+which means \fIblock the users root for service \*(Aqsshd\fR and dba for any service if they are responsible for three or more failed authentication attempts in the last day\*(Aq\&. Finally you can specify multiple triggers like this
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+root:10/1h,20/1d
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+which means \*(Aqblock the user root if they are responsible for ten or more failed attempts in the last hour or twenty or more failed attempts in the last day\&.
+.sp
+Multiple rules can be provided separated by spaces like this
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+*:10/1h root:5/1h,10/1d
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+in which case all rules that match a particular user and service will be checked\&. The user or host will be blocked if any of the rule triggers matches\&. The sense of the user matching can be inverted by placing a \fI!\fR in front of the rule so that
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+!root:20/1d
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+is a rule which would match for all users apart from root\&. It is important to treat root as a special case in the user_rule otherwise excessive attempts to authenticate as root will result in the root account being locked out even for valid holders of root credentials\&. The config file can contain any arguments that would be supplied via PAM config\&. In the config file arguments are placed on separate lines\&. Comments may be included after a \fI#\fR and line continuation is possible by placing a back slash at the end of the line to be continued\&. Here is a sample /etc/security/pam_abl\&.conf:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# /etc/security/pam_abl\&.conf
+debug
+host_db=/var/lib/abl/hosts\&.db
+host_purge=2d
+host_rule=*:10/1h,30/1d
+user_db=/var/lib/abl/users\&.db
+user_purge=2d
+user_rule=!root:10/1h,30/1d
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+All of the standard PAM arguments (debug, expose_account, no_warn, try_first_pass, use_first_pass, use_mapped_pass) are accepted; with the exception of debug and no_warn these are ignored\&.
+.sp
+The arguments that are specific to the PAM module are as follows:
+.PP
+\fBdb_home\fR
+.RS 4
+Specify the directory where the Berkeley db can store it\(cqs lock and log files\&. Make sure this dir exists and is writable\&.
+.RE
+.PP
+\fBlimits\fR
+.RS 4
+It\(cqs value should have the following syntax "<minimum>\-<maximum>"\&. If you do not block machines that do too many attempts, the db can easily become bloated\&. To prevent this we introduced this setting\&. As soon as there are a <maximum> number of attempts for a user/host, the number of stored attempts for this user/host is reduced to <minimum>\&. A <maximum> of 0 means no limits\&. Make sure that <minimum> is larger then any rule specified\&. We recommend a value of "1000\-1200"\&.
+.RE
+.PP
+\fBhost_db, user_db\fR
+.RS 4
+Specify the name of the databases that will be used to log failed authentication attempts\&. The host database is used to log the hostname responsible for a failed auth and the user database is used to log the requested username\&. If host_db or user_db is omitted the corresponding auto blacklisting will be disabled\&.
+.RE
+.PP
+\fBhost_purge, user_purge\fR
+.RS 4
+Specify the length of time for which failed attempts should be kept in the databases\&. For rules to work correctly this must be at least as long as the longest period specified in a corresponding rule\&. You may wish to retain information about failed attempts for longer than this so that the pam_abl command line tool can report information over a longer period of time\&. The format for this item is a number with an optional multiplier suffix,
+\fIs\fR,
+\fIm\fR,
+\fIh\fR
+or
+\fId\fR
+which correspond with seconds, minutes, hours and days\&. To specify seven days for example one would use
+\fI7d\fR\&. Note that in normal operation pam_abl will only purge the logged data for a particular host or user if it happens to be updating it, i\&.e\&. if that host or user makes another failed attempt\&. To purge all old entries the pam_abl command line tool should be used\&.
+.RE
+.PP
+\fBhost_rule, user_rule\fR
+.RS 4
+These are the rules which determine the circumstances under which accounts are auto\-blacklisted\&. The host_rule is used to block access to hosts that are responsible for excessive authentication failures and the user_rule is used to disable accounts for which there have been excessive authentication failures\&. The rule syntax is described in full below\&.
+.RE
+.PP
+\fBhost_clr_cmd, host_blk_cmd, user_clr_cmd, user_blk_cmd\fR
+.RS 4
+These specify commands that will run during a check when an item switches state since its last check\&.
+
+host_clr_cmd and user_clr_cmd will run if the host or user is currently allowed access\&. host_blk_cmd and user_blk_cmd are run if the host or user is currentlybeing blocked by their respective rules\&. If no command is specified, no action is taken\&.
+
+Within the commands, you can specify substitutions with %h, %u and %s, which will be replace with the host name, user name and service currently being checked\&. If there isn\(cqt enough information to fulfill the requested substitutions (eg\&. running the pam_abl tool without specifying all the necessary fields), the command will simply not run\&.
+.RE
+.PP
+\fBhost_whitelist, user_whitelist\fR
+.RS 4
+;\-seperated list of hosts/users whose attempts will not be recorded\&. So if an attempt is made from "10\&.10\&.10\&.10" for user "root" and "root" is in the whitelist, only an attempt for his machine is recorded\&. If a user is whitelisted, this does not prevent his machine from being blocked\&. Hosts can be specified using their IP (1\&.1\&.1\&.1) or using a netmask (1\&.1\&.1\&.1/24)
+.RE
+.SH "EXAMPLE"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# /etc/security/pam_abl\&.conf
+debug
+host_db=/var/lib/abl/hosts\&.db
+host_purge=2d
+host_rule=*:10/1h,30/1d
+host_blk_cmd=iptables \-I INPUT \-s %h \-j DROP
+user_db=/var/lib/abl/users\&.db
+user_purge=2d
+user_rule=!root:10/1h,30/1d
+user_clr_cmd=logger This is a pointless command! user: %u host: %h service: %s
+.fi
+.if n \{\
+.RE
+.\}
+.SH "SEE ALSO"
+.sp
+pam_abl\&.conf(5), pam_abl(1)
+.SH "AUTHORS"
+.sp
+Lode Mertens <pam\-abl@danta\&.be>
+.sp
+Andy Armstrong <andy@hexten\&.net>
+.sp
+Chris Tasma <pam\-abl@deksai\&.com>
+.SH "AUTHOR"
+.PP
+\fBChris Tasma\fR
+.RS 4
+Author.
+.RE

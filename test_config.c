@@ -28,7 +28,7 @@
 
 static void testSplit(const char *cmd, int nofParts, const char **parts) {
     char *command = strdup(cmd);
-    int nof = splitCommand(command, NULL, NULL);
+    int nof = splitCommand(command, NULL);
     if (nof != nofParts) {
         printf("   The number of parts for \"%s\" is not %d.\n", command, nofParts);
         free(command);
@@ -40,7 +40,7 @@ static void testSplit(const char *cmd, int nofParts, const char **parts) {
         //just fill in something random, that will crash if accessed
         for (; p<nofParts; ++p)
             resultParts[p] = (char*)(0x1);
-        nof = splitCommand(command, resultParts, NULL);
+        nof = splitCommand(command, resultParts);
         if (nof != nofParts) {
             printf("   While actually parsing: The number of parts for \"%s\" is not %d.\n", command, nofParts);
             free(command);
@@ -64,7 +64,7 @@ static void testSplit(const char *cmd, int nofParts, const char **parts) {
 
 static void testSplitExpectError(const char *cmd) {
     char *command = strdup(cmd);
-    int nof = splitCommand(command, NULL, NULL);
+    int nof = splitCommand(command, NULL);
     if (nof >= 0)
         printf("   Expected an error while splitting \"%s\".\n", command);
     free(command);

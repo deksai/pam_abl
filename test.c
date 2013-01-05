@@ -17,7 +17,9 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "test.h"
+#include "dbfun.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,7 +29,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "dbfun.h"
 
 void removeDir(const char *dirname) {
     DIR *dir;
@@ -60,15 +61,20 @@ void makeDir(const char *dirname) {
 int main(int argc, const char *argv[]) {
     //for the test running a command we need to run an external command. Because we can't rely on a particular
     //executable being present, we provide our own external command
-    if (argc >= 3) {
+    if (argc >= 4) {
         if (strcmp(argv[1], "-e") == 0) {
             int exitCode = atoi(argv[2]);
             exit(exitCode);
         }
+        //XXX Not sure where to put this...
+        printf("Please specify a database module to use.\n");
+        return 1;
     }
-    printf("Using db version \"%s\" %d.%d.%d\n", DB_VERSION_STRING, DB_VERSION_MAJOR, DB_VERSION_MINOR, DB_VERSION_PATCH);
+    config_create();
+    args->db_module = argv[1];
+    printf("%s",args->db_module);
     runTypeTests();
-    runDatabaseTests();
+    //runDatabaseTests();
     runtRuleTests();
     testAbl();
     testExternalCommand(argv[0]);

@@ -17,45 +17,17 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "test.h"
 #include "pam_abl.h"
+#include "test.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <dlfcn.h>
 
 #define TEST_DIR "/tmp/pam-abl_test-dir"
 
-static void testPamAblDbEnv() {
-    //first start off wit a non existing dir, we expect it to fail
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.db_home = "/tmp/blaat/non-existing";
-    args.host_db = "/tmpt/blaat/non-existing/hosts.db";
-    args.user_db = "/tmpt/blaat/non-existing/users.db";
-
-    printf("   This message should be followed by 2 errors (No such file or directory ...).\n");
-    PamAblDbEnv *dummy = openPamAblDbEnvironment(&args, NULL);
-    if (dummy) {
-        printf("   The db could be opened on a non existing environment.\n");
-    }
-
-    //next start it using an existing dir, it should succeed
-    removeDir(TEST_DIR);
-    makeDir(TEST_DIR);
-    args.db_home = TEST_DIR;
-    args.host_db = TEST_DIR"/hosts.db";
-    args.user_db = TEST_DIR"/users.db";
-    dummy = openPamAblDbEnvironment(&args, NULL);
-    if (dummy) {
-        destroyPamAblDbEnvironment(dummy);
-    } else {
-        printf("   The db could be opened on a non existing environment.\n");
-    }
-    removeDir(TEST_DIR);
-}
-
-static int setupTestEnvironment(PamAblDbEnv **dbEnv) {
+static int setupTestEnvironment(abl_db **_abldb) {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
     char *userClearBuffer = malloc(100);
@@ -66,16 +38,26 @@ static int setupTestEnvironment(PamAblDbEnv **dbEnv) {
     memset(userBlockedBuffer, 0, 100);
     char *hostBlockedBuffer = malloc(100);
     memset(hostBlockedBuffer, 0, 100);
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.db_home = TEST_DIR;
-    args.host_db = TEST_DIR"/hosts.db";
-    args.user_db = TEST_DIR"/users.db";
-    *dbEnv = openPamAblDbEnvironment(&args, NULL);
-    if (!*dbEnv) {
-        printf("   The db environment could not be opened.\n");
+    //config_create();
+    args->db_home = TEST_DIR;
+    //args->db_module = db_module;
+
+    void *dblib = NULL;
+    abl_db *(*db_open)();
+
+    dblib = dlopen(args->db_module, RTLD_LAZY);
+    if (!dblib) {
+        printf("%s opening database module",dlerror());
         return 1;
     }
+    dlerror();
+    db_open = dlsym(dblib, "abl_db_open");
+    *_abldb = db_open();
+    if (!_abldb) {
+        printf("Could not open database\n");
+        return 1;
+    }
+    abl_db *abldb = *_abldb;
 
     int i = 0;
     for (; i < 20; ++i) {
@@ -108,13 +90,13 @@ static int setupTestEnvironment(PamAblDbEnv **dbEnv) {
             if (addAttempt(hostBlockedState, USER_BLOCKED, logTime, "user", "Service", 0, 0))
                 printf("   Could not add an attempt for host %s.\n", hostBlockedBuffer);
         }
-        if (saveInfo((*dbEnv)->m_userDb, userClearBuffer, userClearState))
+        if (abldb->put(abldb, userClearBuffer, userClearState, USER))
             printf("   Could not save state for user %s.\n", userClearBuffer);
-        if (saveInfo((*dbEnv)->m_userDb, userBlockedBuffer, userBlockedState))
+        if (abldb->put(abldb, userBlockedBuffer, userBlockedState, USER))
             printf("   Could not save state for user %s.\n", userBlockedBuffer);
-        if (saveInfo((*dbEnv)->m_hostDb, hostClearBuffer, hostClearState))
+        if (abldb->put(abldb, hostClearBuffer, hostClearState, HOST))
             printf("   Could not save state for host %s.\n", hostClearBuffer);
-        if (saveInfo((*dbEnv)->m_hostDb, hostBlockedBuffer, hostBlockedState))
+        if (abldb->put(abldb, hostBlockedBuffer, hostBlockedState, HOST))
             printf("   Could not save state for host %s.\n", hostBlockedBuffer);
         destroyAuthState(userClearState);
         destroyAuthState(userBlockedState);
@@ -125,32 +107,30 @@ static int setupTestEnvironment(PamAblDbEnv **dbEnv) {
     free(hostClearBuffer);
     free(userBlockedBuffer);
     free(hostBlockedBuffer);
+    //config_free();
     return 0;
 }
 
-static void checkAttempt(const char *user, const char *userRule, BlockState newUserState,
+static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, BlockState newUserState,
                          const char *host, const char *hostRule, BlockState newHostState,
-                         const char *service, BlockState expectedBlockState, BlockReason bReason, const PamAblDbEnv *dbEnv) {
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.host_rule = hostRule;
-    args.user_rule = userRule;
+                         const char *service, BlockState expectedBlockState, BlockReason bReason) {
+    args->host_rule = hostRule;
+    args->user_rule = userRule;
 
     abl_info info;
     memset(&info, 0, sizeof(abl_info));
     info.user = user;
     info.host = host;
     info.service = service;
-    BlockState newState = check_attempt(dbEnv, &args, &info, NULL);
+    BlockState newState = check_attempt(abldb, &info);
     if (newState != expectedBlockState) {
         printf("   Expected attempt to have as result %d, yet %d was returned.\n", (int)expectedBlockState, (int)newState);
     }
     if (info.blockReason != bReason) {
         printf("   Expected the reason to be %d, yet %d was returned.\n", (int)bReason, (int)info.blockReason);
     }
-    startTransaction(dbEnv->m_environment);
     AuthState *userState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_userDb, user, &userState))
+    if (abldb->get(abldb, user, &userState, USER))
         printf("   Could not retrieve the current state of the user.\n");
     if (userState) {
         BlockState retrievedState = getState(userState);
@@ -162,7 +142,7 @@ static void checkAttempt(const char *user, const char *userRule, BlockState newU
     }
 
     AuthState *hostState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_hostDb, host, &hostState))
+    if (abldb->get(abldb, host, &hostState, HOST))
         printf("   Could not retrieve the current state of the host.\n");
     if (hostState) {
         BlockState retrievedState = getState(hostState);
@@ -172,14 +152,14 @@ static void checkAttempt(const char *user, const char *userRule, BlockState newU
     } else {
         printf("   Does the host not exist in the db?.\n");
     }
-    abortTransaction(dbEnv->m_environment);
+    //config_free();
 }
 
 static void testCheckAttempt() {
     removeDir(TEST_DIR);
 
-    PamAblDbEnv *dbEnv = NULL;
-    if (setupTestEnvironment(&dbEnv) || !dbEnv) {
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
         printf("   Could not create our test environment.\n");
         return;
     }
@@ -190,42 +170,42 @@ static void testCheckAttempt() {
     const char *service = "Service";
 
     //user clear, host clear, no blocking
-    checkAttempt("cu_0", clearRule, CLEAR, "ch_0", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, dbEnv);
+    checkAttempt(abldb, "cu_0", clearRule, CLEAR, "ch_0", clearRule, CLEAR, service, CLEAR, AUTH_FAILED);
     //user clear, host clear, user blocked
-    checkAttempt("cu_1", blockRule, BLOCKED, "ch_1", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED, dbEnv);
+    checkAttempt(abldb, "cu_1", blockRule, BLOCKED, "ch_1", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED);
     //user clear, host clear, host blocked
-    checkAttempt("cu_2", clearRule, CLEAR, "ch_2", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, dbEnv);
+    checkAttempt(abldb, "cu_2", clearRule, CLEAR, "ch_2", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED);
     //user clear, host clear, both blocked
-    checkAttempt("cu_3", blockRule, BLOCKED, "ch_3", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED, dbEnv);
+    checkAttempt(abldb, "cu_3", blockRule, BLOCKED, "ch_3", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED);
 
     //user blocked, host clear, no blocking
-    checkAttempt("bu_4", clearRule, CLEAR, "ch_4", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, dbEnv);
+    checkAttempt(abldb, "bu_4", clearRule, CLEAR, "ch_4", clearRule, CLEAR, service, CLEAR, AUTH_FAILED);
     //user blocked, host clear, user blocked
-    checkAttempt("bu_5", blockRule, BLOCKED, "ch_5", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED, dbEnv);
+    checkAttempt(abldb, "bu_5", blockRule, BLOCKED, "ch_5", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED);
     //user blocked, host clear, host blocked
-    checkAttempt("bu_6", clearRule, CLEAR, "ch_6", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, dbEnv);
+    checkAttempt(abldb, "bu_6", clearRule, CLEAR, "ch_6", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED);
     //user blocked, host clear, both blocked
-    checkAttempt("bu_7", blockRule, BLOCKED, "ch_7", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED, dbEnv);
+    checkAttempt(abldb, "bu_7", blockRule, BLOCKED, "ch_7", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED);
 
     //user clear, host blocked, no blocking
-    checkAttempt("cu_8", clearRule, CLEAR, "bh_8", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, dbEnv);
+    checkAttempt(abldb, "cu_8", clearRule, CLEAR, "bh_8", clearRule, CLEAR, service, CLEAR, AUTH_FAILED);
     //user clear, host blocked, user blocked
-    checkAttempt("cu_9", blockRule, BLOCKED, "bh_9", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED, dbEnv);
+    checkAttempt(abldb, "cu_9", blockRule, BLOCKED, "bh_9", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED);
     //user clear, host blocked, host blocked
-    checkAttempt("cu_10", clearRule, CLEAR, "bh_10", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, dbEnv);
+    checkAttempt(abldb, "cu_10", clearRule, CLEAR, "bh_10", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED);
     //user clear, host blocked, both blocked
-    checkAttempt("cu_11", blockRule, BLOCKED, "bh_11", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED, dbEnv);
+    checkAttempt(abldb, "cu_11", blockRule, BLOCKED, "bh_11", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED);
 
     //user blocked, host blocked, no blocking
-    checkAttempt("bu_12", clearRule, CLEAR, "bh_12", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, dbEnv);
+    checkAttempt(abldb, "bu_12", clearRule, CLEAR, "bh_12", clearRule, CLEAR, service, CLEAR, AUTH_FAILED);
     //user blocked, host blocked, user blocked
-    checkAttempt("bu_13", blockRule, BLOCKED, "bh_13", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED, dbEnv);
+    checkAttempt(abldb, "bu_13", blockRule, BLOCKED, "bh_13", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED);
     //user blocked, host blocked, host blocked
-    checkAttempt("bu_14", clearRule, CLEAR, "bh_14", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, dbEnv);
+    checkAttempt(abldb, "bu_14", clearRule, CLEAR, "bh_14", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED);
     //user blocked, host blocked, both blocked
-    checkAttempt("bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED, dbEnv);
+    checkAttempt(abldb, "bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED);
 
-    destroyPamAblDbEnvironment(dbEnv);
+    abldb->close(abldb);
     removeDir(TEST_DIR);
 }
 
@@ -236,10 +216,9 @@ static void testRecordAttempt() {
     char serviceBuffer[100];
     time_t currentTime = time(NULL);
 
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.host_purge = 60*60*24; //1 day
-    args.user_purge = 60*60*24; //1 day
+    //config_create();
+    args->host_purge = 60*60*24; //1 day
+    args->user_purge = 60*60*24; //1 day
 
     abl_info info;
     memset(&info, 0, sizeof(abl_info));
@@ -248,8 +227,8 @@ static void testRecordAttempt() {
     info.host = &hostBuffer[0];
     info.service = &serviceBuffer[0];
 
-    PamAblDbEnv *dbEnv = NULL;
-    if (setupTestEnvironment(&dbEnv) || !dbEnv) {
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
         printf("   Could not create our test environment.\n");
         return;
     }
@@ -261,21 +240,20 @@ static void testRecordAttempt() {
             snprintf(&userBuffer[0], 100, "user_%d", y);
             snprintf(&hostBuffer[0], 100, "host_%d", y);
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
-            if (record_attempt(dbEnv, &args, &info, NULL))
+            if (record_attempt(abldb, &info))
                 printf("   Could not add an attempt.\n");
         }
     }
 
-    startTransaction(dbEnv->m_environment);
     for (y = 0; y < 10; ++y) {
         snprintf(&userBuffer[0], 100, "user_%d", y);
         snprintf(&hostBuffer[0], 100, "host_%d", y);
         snprintf(&serviceBuffer[0], 100, "service_%d", y);
         AuthState *userState = NULL;
         AuthState *hostState = NULL;
-        if (getUserOrHostInfo(dbEnv->m_userDb, &userBuffer[0], &userState))
+        if (abldb->get(abldb, &userBuffer[0], &userState, USER))
             printf("   Could not retrieve info for user %s.\n", &userBuffer[0]);
-        if (getUserOrHostInfo(dbEnv->m_hostDb, &hostBuffer[0], &hostState))
+        if (abldb->get(abldb, &hostBuffer[0], &hostState, HOST))
             printf("   Could not retrieve info for host %s.\n", &hostBuffer[0]);
         if (userState && hostState) {
             if (getNofAttempts(userState) != 5 || getNofAttempts(hostState) != 5) {
@@ -313,10 +291,10 @@ static void testRecordAttempt() {
         if (hostState)
             destroyAuthState(hostState);
     }
-    commitTransaction(dbEnv->m_environment);
 
-    destroyPamAblDbEnvironment(dbEnv);
     removeDir(TEST_DIR);
+    abldb->close(abldb);
+    //config_free();
 }
 
 static void testRecordAttemptWhitelistHost() {
@@ -325,16 +303,16 @@ static void testRecordAttemptWhitelistHost() {
     char serviceBuffer[100];
     char hostBuffer[100];
 
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.host_purge = 60*60*24; //1 day
-    args.user_purge = 60*60*24; //1 day
-    args.host_whitelist = "1.1.1.1;2.2.2.2/32;127.0.0.1";
-    args.user_whitelist = "blaat1;username;blaat3";
+    //config_create();
+    args->host_purge = 60*60*24; //1 day
+    args->user_purge = 60*60*24; //1 day
+    args->host_whitelist = "1.1.1.1;2.2.2.2/32;127.0.0.1";
+    args->user_whitelist = "blaat1;username;blaat3";
 
     abl_info info;
-    PamAblDbEnv *dbEnv = NULL;
-    if (setupTestEnvironment(&dbEnv) || !dbEnv) {
+
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
         printf("   Could not create our test environment.\n");
         return;
     }
@@ -354,13 +332,13 @@ static void testRecordAttemptWhitelistHost() {
             snprintf(&userBuffer[0], 100, "user_%d", y);
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
             info.host = "127.0.0.1";
-            if (record_attempt(dbEnv, &args, &info, NULL))
+            if (record_attempt(abldb, &info))
                 printf("   Could not add an attempt.\n");
 
             snprintf(&userBuffer[0], 100, "user__%d", y);
             snprintf(&serviceBuffer[0], 100, "service__%d", y);
             info.host = "";
-            if (record_attempt(dbEnv, &args, &info, NULL))
+            if (record_attempt(abldb, &info))
                 printf("   Could not add an attempt.\n");
 
             //
@@ -371,21 +349,20 @@ static void testRecordAttemptWhitelistHost() {
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
 
             info.user = "username";
-            if (record_attempt(dbEnv, &args, &info, NULL))
+            if (record_attempt(abldb, &info))
                 printf("   Could not add an attempt.\n");
 
             info.user = "";
-            if (record_attempt(dbEnv, &args, &info, NULL))
+            if (record_attempt(abldb, &info))
                 printf("   Could not add an attempt.\n");
         }
     }
 
-    startTransaction(dbEnv->m_environment);
     for (y = 0; y < 10; ++y) {
         snprintf(&userBuffer[0], 100, "user_%d", y);
         snprintf(&serviceBuffer[0], 100, "service_%d", y);
         AuthState *userState = NULL;
-        if (getUserOrHostInfo(dbEnv->m_userDb, &userBuffer[0], &userState))
+        if (abldb->get(abldb, &userBuffer[0], &userState, USER))
             printf("   Could not retrieve info for user %s.\n", &userBuffer[0]);
         if (userState) {
             if (getNofAttempts(userState) != 5) {
@@ -398,42 +375,43 @@ static void testRecordAttemptWhitelistHost() {
     }
 
     AuthState *hostState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_hostDb, "127.0.0.1", &hostState))
+    if (abldb->get(abldb, "127.0.0.1", &hostState, HOST))
         printf("   Could not retrieve info for host 127.0.0.1.\n");
     if (hostState)
         printf("   We expected an empty state for host 127.0.0.1\n");
 
     hostState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_hostDb, "", &hostState))
+    if (abldb->get(abldb, "", &hostState, HOST))
         printf("   Could not retrieve info for the empty host.\n");
     if (hostState)
         printf("   We expected an empty state for the empty host\n");
 
 
     AuthState *userState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_userDb, "", &userState))
+    if (abldb->get(abldb, "", &userState, USER))
         printf("   Could not retrieve info for the empty user.\n");
     if (userState)
         printf("   We expected an empty state for the empty user\n");
 
     userState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_userDb, "username", &userState))
+    if (abldb->get(abldb, "username", &userState, USER))
         printf("   Could not retrieve info for the empty user.\n");
     if (userState)
         printf("   We expected an empty state for the empty user\n");
 
-    commitTransaction(dbEnv->m_environment);
-    destroyPamAblDbEnvironment(dbEnv);
+    //XXX closedb?
+    //destroyPamAblDbEnvironment(dbEnv);
+    //config_free();
+    abldb->close(abldb);
     removeDir(TEST_DIR);
 }
 
 static void testRecordAttemptPurge() {
     removeDir(TEST_DIR);
 
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.host_purge = 25;
-    args.user_purge = 15;
+    //config_create();
+    args->host_purge = 25;
+    args->user_purge = 15;
 
     abl_info info;
     memset(&info, 0, sizeof(abl_info));
@@ -442,23 +420,22 @@ static void testRecordAttemptPurge() {
     info.host = "ch_0";
     info.service = "Cool_Service";
 
-    PamAblDbEnv *dbEnv = NULL;
-    if (setupTestEnvironment(&dbEnv) || !dbEnv) {
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
         printf("   Could not create our test environment.\n");
         return;
     }
 
-    if (record_attempt(dbEnv, &args, &info, NULL))
+    if (record_attempt(abldb, &info))
         printf("   Could not add an attempt.\n");
 
     //we know in the db every 10 seconds an attempt was made, lets's see if it is purged enough
     //time_t logTime = tm - x*10;
-    startTransaction(dbEnv->m_environment);
     AuthState *userState = NULL;
     AuthState *hostState = NULL;
-    if (getUserOrHostInfo(dbEnv->m_userDb, info.user, &userState))
+    if (abldb->get(abldb, info.user, &userState, USER))
         printf("   Could not retrieve info for user %s.\n", info.user);
-    if (getUserOrHostInfo(dbEnv->m_hostDb, info.host, &hostState))
+    if (abldb->get(abldb, info.host, &hostState, HOST))
         printf("   Could not retrieve info for host %s.\n", info.host);
     if (userState && hostState) {
         //for the user we purged every attempt older then 15 seconds, so we expect to see: now, now - 10 and our just logged time
@@ -469,58 +446,13 @@ static void testRecordAttemptPurge() {
             printf("   The current host state holds %d entries.\n", getNofAttempts(hostState));
         }
     }
-    commitTransaction(dbEnv->m_environment);
-    destroyPamAblDbEnvironment(dbEnv);
+    //destroyPamAblDbEnvironment(dbEnv);
+    //config_free();
+    abldb->close(abldb);
     if (userState)
         destroyAuthState(userState);
     if (hostState)
         destroyAuthState(hostState);
-}
-
-static void testOpenOnlyHostDb() {
-    removeDir(TEST_DIR);
-    makeDir(TEST_DIR);
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.db_home = TEST_DIR;
-    args.host_db = TEST_DIR"/hosts.db";
-    args.user_db = NULL;
-    PamAblDbEnv *dbEnv = openPamAblDbEnvironment(&args, NULL);
-    if (!dbEnv) {
-        printf("   The db environment could not be opened.\n");
-        return;
-    }
-    if (!dbEnv->m_environment)
-        printf("   The db environment was not filled in.\n");
-    if (dbEnv->m_userDb)
-        printf("   The user db was filled in.\n");
-    if (!dbEnv->m_hostDb)
-        printf("   The host db was not filled in.\n");
-    destroyPamAblDbEnvironment(dbEnv);
-    removeDir(TEST_DIR);
-}
-
-static void testOpenOnlyUserDb() {
-    removeDir(TEST_DIR);
-    makeDir(TEST_DIR);
-    abl_args args;
-    memset(&args, 0, sizeof(abl_args));
-    args.db_home = TEST_DIR;
-    args.host_db = NULL;
-    args.user_db = TEST_DIR"/users.db";
-    PamAblDbEnv *dbEnv = openPamAblDbEnvironment(&args, NULL);
-    if (!dbEnv) {
-        printf("   The db environment could not be opened.\n");
-        return;
-    }
-    if (!dbEnv->m_environment)
-        printf("   The db environment was not filled in.\n");
-    if (!dbEnv->m_userDb)
-        printf("   The user db was not filled in.\n");
-    if (dbEnv->m_hostDb)
-        printf("   The host db was filled in.\n");
-    destroyPamAblDbEnvironment(dbEnv);
-    removeDir(TEST_DIR);
 }
 
 static u_int32_t getIp(int x, int y, int z, int j) {
@@ -805,8 +737,6 @@ static void testSubstituteWithPercent() {
 
 void testAbl() {
     printf("Abl test start.\n");
-    printf(" Starting testPamAblDbEnv.\n");
-    testPamAblDbEnv();
     printf(" Starting testCheckAttempt.\n");
     testCheckAttempt();
     printf(" Starting testRecordAttempt.\n");
@@ -815,10 +745,6 @@ void testAbl() {
     testRecordAttemptWhitelistHost();
     printf(" Starting testRecordAttemptPurge.\n");
     testRecordAttemptPurge();
-    printf(" Starting testOpenOnlyHostDb.\n");
-    testOpenOnlyHostDb();
-    printf(" Starting testOpenOnlyUserDb.\n");
-    testOpenOnlyUserDb();
     printf(" Starting testParseIpValid.\n");
     testParseIpValid();
     printf(" Starting testParseIpInvalid.\n");
@@ -909,7 +835,7 @@ static void testRunCommandHelper(const char *origCommand, int isOk, const abl_in
     for (i = 0; i < 2; ++i) {
         s_execFun_called = 0;
         s_execFun_exitCode = i;
-        int returnCode = _runCommand(origCommand, info, NULL, execFun);
+        int returnCode = _runCommand(origCommand, info, execFun);
         if (s_execFun_called != isOk) {
             if (isOk)
                 printf("   Expected the command \"%s\" to be called.", arg1);
