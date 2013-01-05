@@ -21,13 +21,10 @@
 #ifndef PAM_ABL_H
 #define PAM_ABL_H
 
+#include "dbfun.h"
 #include "config.h"
 #include "typefun.h"
 #include <sys/types.h>
-
-typedef struct abl_db abl_db;
-
-abl_db *(*db_open)();
 
 typedef struct {
     BlockReason blockReason;

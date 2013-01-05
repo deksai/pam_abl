@@ -97,10 +97,4 @@ int kc_c_close(abl_db *abldb);
 */
 int kc_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize);
 
-/*
-  Opens a database environment.
-  \return A pointer to the opened database object.
-*/
-abl_db* abl_db_open();
-
 #endif

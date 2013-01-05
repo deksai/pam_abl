@@ -17,7 +17,9 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "test.h"
+#include "dbfun.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -26,7 +28,6 @@
 #include <dirent.h>
 #include <string.h>
 
-#include "dbfun.h"
 
 void removeDir(const char *dirname) {
     DIR *dir;
@@ -56,10 +57,17 @@ void makeDir(const char *dirname) {
     mkdir(dirname, S_IRWXU);
 }
 
-int main() {
-    printf("Using db version \"%s\" %d.%d.%d\n", DB_VERSION_STRING, DB_VERSION_MAJOR, DB_VERSION_MINOR, DB_VERSION_PATCH);
+
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        printf("Please specify a database module to use.\n");
+        return 1;
+    }
+    config_create();
+    args->db_module = argv[1];
+    printf("%s",args->db_module);
     runTypeTests();
-    runDatabaseTests();
+    //runDatabaseTests();
     runtRuleTests();
     testAbl();
     return 0;

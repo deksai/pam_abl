@@ -538,7 +538,6 @@ int main(int argc, char **argv) {
     int n, c;
     char *conf = NULL;
     char *service = "none";
-    void *dblib;
     abl_db   *abldb = NULL;
     config_create();
     abl_info info;
@@ -661,16 +660,17 @@ int main(int argc, char **argv) {
 
     /* Most everything should be set, and it should be safe to open the
      * databases. */
+    void *dblib = NULL;
+    abl_db *(*db_open)();
 
     dblib = dlopen(args->db_module, RTLD_LAZY);
     if (!dblib) {
-        log_sys_error(err, "opening database module");
+        log_error("%s opening database module",dlerror());
         goto main_done;
     }
     dlerror();
     db_open = dlsym(dblib, "abl_db_open");
     abldb = db_open();
-    
     if (!abldb) {
         return 1;
     }

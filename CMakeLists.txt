@@ -27,13 +27,13 @@ set(ABL_KCDB_LIB_SRC
     kc.c
 )
 
-#set(PAM_ABL_TEST_SRC
-#   test_abl.c
-#   test.c
-#   test_db.c
-#   test_rule.c
-#   test_types.c
-#)
+set(PAM_ABL_TEST_SRC
+    test_abl.c
+    test.c
+    #test_db.c
+    test_rule.c
+    test_types.c
+)
 
 find_package(BerkeleyDB)
 find_package(Pam REQUIRED)
@@ -67,9 +67,9 @@ set_target_properties(pam_abl_bin PROPERTIES OUTPUT_NAME pam_abl)
 set_target_properties(pam_abl_bin PROPERTIES COMPILE_DEFINITIONS "TOOLS")
 target_link_libraries(pam_abl_bin ${DB_LIBRARY} dl)
 
-#add_executable(pam_abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
-#set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
-#target_link_libraries(pam_abl_test ${DB_LIBRARY} )
+add_executable(pam_abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
+set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
+target_link_libraries(pam_abl_test ${DB_LIBRARY} dl )
 
 add_library(pam_abl_bdb SHARED ${ABL_BDB_LIB_SRC})
 target_link_libraries(pam_abl_bdb ${DB_LIBRARY} ${PAM_LIBRARY})
