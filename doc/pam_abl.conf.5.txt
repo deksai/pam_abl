@@ -185,17 +185,28 @@ authentication failures. The rule syntax is
 described in full below.                      
 
 *host_clr_cmd, host_blk_cmd, user_clr_cmd, user_blk_cmd*::
+Deprecated for security reasons. Please use the corresponding safer option:
+host_clear_cmd, host_block_cmd, user_clear_cmd, user_block_cmd
+
+*host_clear_cmd, host_block_cmd, user_clear_cmd, user_block_cmd*::
 These specify commands that will run during a check when an item switches
 state since its last check. +
-host_clr_cmd and user_clr_cmd will run if the host or user is currently allowed
-access.  host_blk_cmd and user_blk_cmd are run if the host or user is
-currentlybeing blocked by their respective rules.  If no command is specified,
-no action is taken. +
+host_clear_cmd and user_clear_cmd will run if the host or user is currently
+allowed access. host_block_cmd and user_block_cmd are run if the host or user
+is currently being blocked by their respective rules. +
 Within the commands, you can specify substitutions with %h, %u and %s, which
 will be replace with the host name, user name and service currently being
-checked.  If there isn't enough information to fulfill the requested
-substitutions (eg. running the pam_abl tool without specifying all the
-necessary fields), the command will simply not run.
+checked. For security reasons we do not run the command using the system call.
+We use the more secure fork/exec solution. This means that you can't specify
+input and output redirections. +
+Note that this also means that no escaping is done, so if you call a shell
+here, you might introduce a security problem. +
+The commands should follow a special syntax (you can use the command line tool
+with the -d option to test the parsing of your commands) where the command and
+it's different arguments need to be enclosed in [] and all text not enclosed
+in [] is simply ignored. For example: "[/usr/bin/logger] ignored [block]
+[user] [%u]" will run the command "/usr/bin/logger block user <current user>".
+If you want to specify a '[', ']' or '\', you need to escape them with a '\'.
 
 *host_whitelist, user_whitelist*::
 ;-seperated list of hosts/users whose attempts will not be recorded. 
@@ -213,11 +224,11 @@ debug
 host_db=/var/lib/abl/hosts.db 
 host_purge=2d                 
 host_rule=*:10/1h,30/1d       
-host_blk_cmd=iptables -I INPUT -s %h -j DROP
+host_block_cmd=[/sbin/iptables] [-I] [INPUT] [-s] [%h] [-j] [DROP]
 user_db=/var/lib/abl/users.db 
 user_purge=2d                 
 user_rule=!root:10/1h,30/1d   
-user_clr_cmd=logger This is a pointless command! user: %u host: %h service: %s
+user_clear_cmd=[/usr/bin/logger] [block] [user] [%u]
 ----------------------------
 
 SEE ALSO

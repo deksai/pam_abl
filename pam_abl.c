@@ -25,106 +25,181 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
+
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define DB_NAME "state"
 #define COMMAND_SIZE 1024
 
-static int prepare_command(const char *cmd, const abl_info *info, char **string) {
-    int i;
-    int cmd_sz = strlen(cmd);
-    int strstore_sz = 0;
+/*
+ * Substitute the user/host/service in the given string
+ * \param str: The string where we need to substitute in.
+               '%' is the escape char, so if you want a '%' in your string you will need to add 2: '%%' => '%'
+               If the char after the '%' is not in [uhs] then it is just copied to the output buffer '%r' => 'r'
+               '%u' => info->user
+               '%h' => info->host
+               '%s' => info->service
+ * \param info: The info that needs to be filled in
+ * \param result: The buffer to write to. if this is NULL nothing will be written, only the number of bytes needed is returned
+ * \return: The number of bytes needed to do the substitution, negative on failure. This will include the \0 char at the end
+ */
+int prepare_string(const char *str, const abl_info *info, char *result) {
     int host_sz = 0;
     int user_sz = 0;
     int service_sz = 0;
-    char subst;
-    char *strstore = *string; //Because double pointers get confusing
 
-    if(info->host != NULL) host_sz = strlen(info->host);
-    if(info->user != NULL) user_sz = strlen(info->user);
-    if(info->service != NULL) service_sz = strlen(info->service);
+    if(info->host != NULL)
+        host_sz = strlen(info->host);
+    if(info->user != NULL)
+        user_sz = strlen(info->user);
+    if(info->service != NULL)
+        service_sz = strlen(info->service);
 
-    strstore = calloc(COMMAND_SIZE,sizeof(char));
-    if (strstore == NULL) {
-        log_error( "Could not allocate memory for running command");
-        return -1;
-    }
-
-    for(i=0; i < cmd_sz; i++) {
-        if(*(cmd + i)  == '%') {
-            subst = *(cmd + i + 1); //grab substitution letter
-            i += 2;                 //move index past '%x'
-            switch(subst) {
+    int inputIndex = 0;
+    int outputIndex = 0;
+    int percentSeen = 0;
+    while (str[inputIndex]) {
+        if (percentSeen) {
+            percentSeen = 0;
+            switch (str[inputIndex]) {
                 case 'u':
-                    if(strstore_sz + user_sz >= COMMAND_SIZE) {
-                        log_warning( "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+user_sz,COMMAND_SIZE);
-                        return(1);
-                    }
-                    else if (!info->user) {
-                        log_warning( "No user to substitute: %s.",cmd);
-                        return(1);
-                    }
-                    else {
-                        strcat(strstore,info->user);
-                        strstore_sz += user_sz;
-                    }
+                    if (result && info->user)
+                        memcpy(result+outputIndex,info->user, user_sz);
+                    outputIndex += user_sz;
                     break;
                 case 'h':
-                    if(strstore_sz + host_sz >= COMMAND_SIZE) {
-                        log_warning( "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+host_sz,COMMAND_SIZE);
-                        return(1);
-                    }
-                    else if (!info->host) {
-                        log_warning( "No host to substitute: %s.",cmd);
-                        return(1);
-                    }
-                    else {
-                        strcat(strstore,info->host);
-                        strstore_sz += host_sz;
-                    }
+                    if (result && info->host)
+                        memcpy(result+outputIndex,info->host, host_sz);
+                    outputIndex += host_sz;
                     break;
                 case 's':
-                    if(strstore_sz + service_sz >= COMMAND_SIZE) {
-                        log_warning( "command length error: %d > %d.  Adjust COMMAND_SIZE in pam_abl.h\n",strlen(strstore)+service_sz,COMMAND_SIZE);
-                        return(1);
-                    }
-                    else if (!info->service) {
-                        log_warning( "No service to substitute: %s.",cmd);
-                        return(1);
-                    }
-                    else {
-                        strcat(strstore,info->service);
-                        strstore_sz += service_sz;
-                    }
+                    if (result && info->service)
+                        memcpy(result+outputIndex,info->service, service_sz);
+                    outputIndex += service_sz;
                     break;
                 default:
+                    //no special char, let's just add the char to the output buffer
+                    if (result)
+                        result[outputIndex] = str[inputIndex];
+                    ++outputIndex;
                     break;
             }
+        } else {
+            if (str[inputIndex] == '%') {
+                percentSeen = 1;
+            } else {
+                if (result)
+                    result[outputIndex] = str[inputIndex];
+                ++outputIndex;
+            }
         }
-        *(strstore + strstore_sz) = *(cmd + i);
-        strstore_sz++;
+        ++inputIndex;
     }
-    *string = strstore;
-    return 0;
+    if (result)
+        result[outputIndex] = '\0';
+    ++outputIndex;
+    return outputIndex;
+}
+
+int ablExec(char *const arg[]) {
+    if (arg == NULL || arg[0] == NULL || (arg[0])[0] == '\0')
+        return -1;
+    pid_t pid = fork();
+    if (pid) {
+        //parent
+        int childStatus = 0;
+        waitpid(pid, &childStatus, 0);
+        return WEXITSTATUS(childStatus);
+    } else if (pid == 0) {
+        //child
+        int result = execv(arg[0], arg);
+        exit(result);
+    } else {
+        //fork failed
+        return -1;
+    }
+}
+
+int _runCommand(const char *origCommand, const abl_info *info, int (execFun)(char *const arg[])) {
+    int  err = 0;
+    int bufSize = 0;
+    int argNum = 0;
+    char** result = NULL;
+    char** substResult = NULL;
+    char *command = NULL;
+
+    if (!origCommand || ! *origCommand)
+        return 0;
+    command = strdup(origCommand);
+    if (!command)
+        return 1;
+
+    //first split the command in it's pieces
+    argNum = splitCommand(command, NULL);
+    //no real command
+    if (argNum == 0)
+        goto cleanup;
+    if (argNum < 0) {
+        err = 1;
+        goto cleanup;
+    }
+
+    result = malloc((argNum+1) * sizeof(char*));
+    substResult = malloc((argNum+1) * sizeof(char*));
+    memset(result, 0, (argNum+1) * sizeof(char*));
+    memset(substResult, 0, (argNum+1) * sizeof(char*));
+    argNum = splitCommand(command, result);
+
+    //now iterate over all the parts of the array and substitute everything
+    int partIndex = 0;
+    while (result[partIndex]) {
+        bufSize = prepare_string(result[partIndex], info, NULL);
+        if (bufSize <= 0) {
+            //crap, something went wrong
+            //the error should already been logged
+            log_warning("failed to substitute %s.", result[partIndex]);
+            err = 1;
+            goto cleanup;
+        }
+        if (bufSize > COMMAND_SIZE) {
+            log_warning("command length error.");
+            goto cleanup;
+        }
+        substResult[partIndex] = malloc(bufSize * sizeof(char));
+        if (substResult[partIndex] == NULL) {
+            err = 1;
+            goto cleanup;
+        }
+        bufSize = prepare_string(result[partIndex], info, substResult[partIndex]);
+        ++partIndex;
+    }
+
+    //the first value in the substResult array is the command to execute
+    //we should now execute the command
+    err = execFun(substResult);
+
+cleanup:
+    //result does not hold dynamically allocated strings
+    if (result) {
+        free(result);
+    }
+    if (substResult) {
+        partIndex = 0;
+        while (substResult[partIndex]) {
+            free(substResult[partIndex]);
+            ++partIndex;
+        }
+        free(substResult);
+    }
+    if (command)
+        free(command);
+    return err;
 }
 
 static int runCommand(const char *origCommand, const abl_info *info) {
-    if (!origCommand || ! *origCommand)
-        return 0;
-    int  err = 0;
-    char *command = NULL;
-
-    err = prepare_command( origCommand, info, &command);
-    if(err != 0) {
-        log_warning( "Failed to run command.");
-    } else if (command) {
-        log_debug("running command %s",command);
-        err = system(command);
-        if (err == -1)
-            log_warning( "Failed to run command: %s",command);
-        free(command);
-    } else if (!command)
-        log_debug("No command to run for this situation.");
-    return err;
+    return _runCommand(origCommand, info, ablExec);
 }
 
 int runHostCommand(BlockState bState, abl_info *info) {

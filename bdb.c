@@ -25,6 +25,8 @@
 #include <errno.h>
 
 #define DBPERM 0600
+//do a checkpoint every 8MB of log
+#define CHECKPOINTSIZE (8000)
 
 //let's allocate a 'large' buffer
 char largeBuffer[1024*50];
@@ -54,6 +56,14 @@ int create_environment(const char *home, bdb_environment **env) {
             log_db_error(err, "setting lock detection.");
         }
     }
+    err = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
+    if (err != 0) {
+        log_db_error(err, "setting automatic log file removal.");
+    }
+    if ((err = dbenv->txn_checkpoint(dbenv, CHECKPOINTSIZE, 0, 0)) != 0) {
+        log_db_error(err, "setting the automatic checkpoint option.");
+    }
+
 
     if (dbenv) {
         bdb_environment *retValue = calloc(1, sizeof(bdb_environment));

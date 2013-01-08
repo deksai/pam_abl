@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 void removeDir(const char *dirname) {
@@ -57,9 +58,15 @@ void makeDir(const char *dirname) {
     mkdir(dirname, S_IRWXU);
 }
 
-
-int main(int argc, char **argv) {
-    if (argc < 2) {
+int main(int argc, const char *argv[]) {
+    //for the test running a command we need to run an external command. Because we can't rely on a particular
+    //executable being present, we provide our own external command
+    if (argc >= 4) {
+        if (strcmp(argv[1], "-e") == 0) {
+            int exitCode = atoi(argv[2]);
+            exit(exitCode);
+        }
+        //XXX Not sure where to put this...
         printf("Please specify a database module to use.\n");
         return 1;
     }
@@ -70,5 +77,8 @@ int main(int argc, char **argv) {
     //runDatabaseTests();
     runtRuleTests();
     testAbl();
+    testExternalCommand(argv[0]);
+    testRunCommand();
+    testConfig();
     return 0;
 }

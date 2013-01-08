@@ -40,7 +40,8 @@ typedef enum {
     CHECK,
     PURGE,
     SHOW,
-    UPDATE
+    UPDATE,
+    DEBUGCOMMAND
 } CommandType;
 
 static int relative  = 0;
@@ -60,6 +61,7 @@ static void usage(const char *prg) {
            "from them. The following options are available:\n\n"
            "MAINTENANCE\n"
            "  -h, --help              See this message.\n"
+           "  -d, --debugcommand      Print the block/clear commands split in arguments.\n"
            "  -p, --purge             Purge databases based on rules in config.\n"
            "  -r, --relative          Display times relative to now.\n"
            "  -v, --verbose           Verbose output.\n"
@@ -532,6 +534,48 @@ static int fail(const abl_db *abldb, abl_info *info) {
     return err;
 }
 
+static void printParsedCommand(const char *commandName, const char *origCommand) {
+    char *commandCopy = NULL;
+    char** result = NULL;
+    int argNum = 0;
+    if (!origCommand || ! *origCommand) {
+        printf("%s: No command\n", commandName);
+        return;
+    }
+    commandCopy = strdup(origCommand);
+    if (!commandCopy) {
+        log_error("Could not duplicate string. Out of memory?");
+        goto cleanup;
+    }
+    argNum = splitCommand(commandCopy, NULL);
+    //no real command
+    if (argNum == 0) {
+        printf("%s: Parsing resulted in no command to run.\n", commandName);
+        goto cleanup;
+    }
+    if (argNum < 0) {
+        printf("%s: Parse error.\n", commandName);
+        goto cleanup;
+    }
+
+    result = malloc((argNum+1) * sizeof(char*));
+    memset(result, 0, (argNum+1) * sizeof(char*));
+    argNum = splitCommand(commandCopy, result);
+
+    int ix = 0;
+    printf("%s: ", commandName);
+    while (result[ix]) {
+        printf("\"%s\" ", result[ix]);
+        ++ix;
+    }
+    printf("\n");
+cleanup:
+    if (commandCopy)
+        free(commandCopy);
+    if (result)
+        free(result);
+}
+
 int main(int argc, char **argv) {
     //assume everything will be ok
     int err = 0;
@@ -552,6 +596,7 @@ int main(int argc, char **argv) {
         int option_index = 0;
         static struct option long_options[] = {
             {"help",        0, 0,    'h' },
+            {"debugcommand",0, 0,    'd' },
             {"purge",       0, 0,    'p' },
             {"update",      0, 0,    'u' },
             {"relative",    0, 0,    'r' },
@@ -566,13 +611,16 @@ int main(int argc, char **argv) {
             {0,             0, 0,     0  }
         };
 
-        c = getopt_long(argc, argv, "hrvpufwcU:H:s:R:",
+        c = getopt_long(argc, argv, "hdrvpufwcU:H:s:R:",
                 long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
             case 'h':
                 usage(argv[0]);
+                break;
+            case 'd':
+                command = DEBUGCOMMAND;
                 break;
             case 'p':
                 command = PURGE;
@@ -637,6 +685,15 @@ int main(int argc, char **argv) {
     mention("Reading config from %s", conf);
     if (err = config_parse_file(conf), 0 != err) {
         return err;
+    }
+
+    if (command == DEBUGCOMMAND) {
+        printParsedCommand("host_block_cmd", args->host_blk_cmd);
+        printParsedCommand("host_clear_cmd", args->host_clr_cmd);
+        printParsedCommand("user_block_cmd", args->user_blk_cmd);
+        printParsedCommand("user_clear_cmd", args->user_clr_cmd);
+        err = 0;
+        goto main_done;
     }
 
     if (NULL == args->db_module) {

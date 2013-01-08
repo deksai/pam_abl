@@ -52,4 +52,26 @@ void config_free();
 int config_parse_args(int argc, const char **argv);
 int config_parse_file(const char *name);
 void dump_args();
+/*
+ * Split a command based on what's between brackets, strings not in brackets are ignored
+ * \param command: the command to split.
+                   The command will be split to all fields between '[]'. If you want a '[' or ']' in your command, precede it by a '\'
+                   If you want a '\', precede it by another '\': '\\' => '\'
+                   All other escape chars are resolved to the char itself: '\c' => 'c'
+ * \param result: if this value is not NULL, this array will be filled with pointers to the different parts.
+ *                The pointers point to memory in the original command.
+ *                Make sure it's big enough
+ * \param logContext: if not NULL this will be used to log syntax errors.
+ * \return: negative if there is a syntax error, otherwise the number of parts
+ * NOTE: command will be modified if result != NULL, \0 will be inserted and escape chars are removed if followed by [ or ]
+ * NOTE: syntax error message can be very cryptic if result != NULL => check with result == NULL for syntax errors first
+ * example:
+        cmd = "lol [command] ignored [arg1] [arg2]"
+        will result in the following result:
+            - result[0] = "command"
+            - result[1] = "arg1"
+            - result[2] = "arg2"
+        with as return value 3
+ */
+int splitCommand(char *command, char* result[]);
 #endif

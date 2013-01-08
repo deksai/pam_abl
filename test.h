@@ -34,7 +34,13 @@ void runTypeTests();
 void runDatabaseTests();
 //test to test the purging and rule matching
 void runtRuleTests();
-//test to test how an attempot should be handled
+//test to test how an attempt should be handled
 void testAbl();
+//test the running of external commands
+void testExternalCommand(const char *cmd);
+//test the integrated parsing of external commands
+void testRunCommand();
+//test the config parsing
+void testConfig();
 
 #endif

@@ -130,8 +130,12 @@ static int parse_arg(const char *arg) {
             log_error("Illegal host_purge value: %s", v);
         }
     } else if (v = is_arg("host_blk_cmd", arg), NULL != v) {
-        args->host_blk_cmd = v;
+        log_error("host_blk_cmd is deprecated for security reasons, please use host_block_cmd.");
     } else if (v = is_arg("host_clr_cmd", arg), NULL != v) {
+        log_error("host_clr_cmd is deprecated for security reasons, please use host_clear_cmd.");
+    } else if (v = is_arg("host_block_cmd", arg), NULL != v) { //we will check if it's valid when we try to run it
+        args->host_blk_cmd = v;
+    } else if (v = is_arg("host_clear_cmd", arg), NULL != v) { //we will check if it's valid when we try to run it
         args->host_clr_cmd = v;
     } else if (v = is_arg("host_whitelist", arg), NULL != v) {
         args->host_whitelist = v;
@@ -142,8 +146,12 @@ static int parse_arg(const char *arg) {
             log_error("Illegal user_purge value: %s", v);
         }
     } else if (v = is_arg("user_blk_cmd", arg), NULL != v) {
-        args->user_blk_cmd = v;
+        log_error("user_blk_cmd is deprecated for security reasons, please use user_block_cmd.");
     } else if (v = is_arg("user_clr_cmd", arg), NULL != v) {
+        log_error("user_clr_cmd is deprecated for security reasons, please use user_clear_cmd.");
+    } else if (v = is_arg("user_block_cmd", arg), NULL != v) { //we will check if it's valid when we try to run it
+        args->user_blk_cmd = v;
+    } else if (v = is_arg("user_clear_cmd", arg), NULL != v) { //we will check if it's valid when we try to run it
         args->user_clr_cmd = v;
     } else if (v = is_arg("user_whitelist", arg), NULL != v) {
         args->user_whitelist = v;
@@ -153,7 +161,6 @@ static int parse_arg(const char *arg) {
         log_error("Illegal option: %s", arg);
         return EINVAL;
     }
-
     return 0;
 }
 
@@ -314,10 +321,12 @@ void dump_args() {
     log_debug("host_rule       = %s",  args->host_rule);
     log_debug("host_purge      = %ld", args->host_purge);
     log_debug("host_blk_cmd    = %s",  args->host_blk_cmd);
+    log_debug("host_clear_cmd  = %s",  args->host_clr_cmd);
 
     log_debug("user_rule       = %s",  args->user_rule);
     log_debug("user_purge      = %ld", args->user_purge);
     log_debug("user_blk_cmd    = %s",  args->user_blk_cmd);
+    log_debug("user_clear_cmd  = %s",  args->user_clr_cmd);
     log_debug("lower limit     = %ld", args->lowerlimit);
     log_debug("upper limit     = %ld", args->upperlimit);
     for (s = args->strs; NULL != s; s = s->link) {
@@ -355,5 +364,59 @@ void config_free() {
     args->strs = NULL;
     free(args);
     args = NULL;
+}
+
+int splitCommand(char *command, char* result[]) {
+    if (command == NULL)
+        return 0;
+    int nofParts = 0;
+    int partStarted = 0;
+    unsigned long inputIndex = 0;
+    unsigned long outputIndex = 0;
+    int lastCharWasEscape = 0;
+    while (command[inputIndex]) {
+        if (lastCharWasEscape) {
+            lastCharWasEscape = 0;
+        } else {
+            switch(command[inputIndex]) {
+                case '\\':
+                    lastCharWasEscape = 1;
+                    //only increase the inputIndex, do not copy the char
+                    ++inputIndex;
+                    continue;
+                case '[':
+                    if (partStarted) {
+                        log_error("command syntax error: parsed '[' while already parsing a part in \"%s\"", command);
+                        return -1;
+                    }
+                    if (result)
+                        result[nofParts] = command+outputIndex+1;
+                    ++nofParts;
+                    partStarted = 1;
+                    break;
+                case ']':
+                    if (!partStarted) {
+                        log_error("command syntax error: parsed ']' without opening '[' in \"%s\"", command);
+                        return -1;
+                    }
+                    partStarted = 0;
+                    if (result)
+                        command[inputIndex] = '\0'; //use inputIndex here so that the copy at the end of the while is correct
+                    break;
+                default:
+                    break;
+            };
+        }
+        if (result)
+            command[outputIndex] = command[inputIndex];
+        ++outputIndex;
+        ++inputIndex;
+    }
+    //syntax error, we didn't see a final ']'
+    if (partStarted) {
+        log_error("command syntax error: no closing ] in \"%s\"", command);
+        return -1;
+    }
+    return nofParts;
 }
 
