@@ -20,15 +20,15 @@
 #define PAM_DBFUN_H
 #include "typefun.h"
 
-typedef struct abl_db abl_db;
+typedef struct abl_db _abl_db;
 typedef struct abl_db {
-    void (*close)(abl_db *db);
-    int (*put)(const abl_db *, const char *object, AuthState *, ablObjectType);
-    int (*del)(const abl_db *, const char *object, ablObjectType);
-    int (*get)(const abl_db *, const char *object, AuthState **, ablObjectType);
-    int (*c_open)(abl_db *, ablObjectType);
-    int (*c_close)(abl_db *);
-    int (*c_get)(abl_db *,char **key,size_t *ksize,char **data,size_t *dsize);
+    void (*close)(_abl_db *db);
+    int (*put)(const _abl_db *, const char *object, AuthState *, ablObjectType);
+    int (*del)(const _abl_db *, const char *object, ablObjectType);
+    int (*get)(const _abl_db *, const char *object, AuthState **, ablObjectType);
+    int (*c_open)(_abl_db *, ablObjectType);
+    int (*c_close)(_abl_db *);
+    int (*c_get)(_abl_db *,char **key,size_t *ksize,char **data,size_t *dsize);
     void *state;
 } abl_db;
 
