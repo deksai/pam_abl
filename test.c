@@ -59,14 +59,17 @@ void makeDir(const char *dirname) {
 }
 
 int main(int argc, const char *argv[]) {
-    //for the test running a command we need to run an external command. Because we can't rely on a particular
-    //executable being present, we provide our own external command
-    if (argc >= 4) {
+
+    //During testCommand, we call this very program as a test since it is
+    //guaranteed to exist.  When called this way, it is called with -e as the
+    //first argument, in which case we merely exit with the given number.
+    if (argc >= 3) {
         if (strcmp(argv[1], "-e") == 0) {
             int exitCode = atoi(argv[2]);
             exit(exitCode);
         }
-        //XXX Not sure where to put this...
+    }
+    if (argc < 2) {
         printf("Please specify a database module to use.\n");
         return 1;
     }
