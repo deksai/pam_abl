@@ -35,7 +35,7 @@ void log_db_error(int err, const char *what) {
     log_error("%s (%d) while %s", db_strerror(err), err, what);
 }
 
-int create_environment(const char *home, bdb_environment **env) {
+int create_environment(const char *home, DB_ENV **env) {
     int err = 0;
     *env = NULL;
     DB_ENV *dbenv = NULL;
@@ -64,45 +64,39 @@ int create_environment(const char *home, bdb_environment **env) {
         log_db_error(err, "setting the automatic checkpoint option.");
     }
 
-
-    if (dbenv) {
-        bdb_environment *retValue = calloc(1, sizeof(bdb_environment));
-        retValue->m_envHandle = dbenv;
-        retValue->m_transaction = NULL;
-        *env = retValue;
-    }
+    *env = dbenv;
     return err;
 }
 
-void destroy_environment(bdb_environment *env) {
+void destroy_environment(DB_ENV *env) {
     if (!env)
         return;
-    if (env->m_envHandle)
-        env->m_envHandle->close(env->m_envHandle, 0);
-    env->m_envHandle = NULL;
+    env->close(env, 0);
+    env = NULL;
     free(env);
 }
 
-/*
-int startTransaction(bdb_environment *env) {
-    if (!env || !env->m_envHandle)
-        return 1;
-    //for the moment we only support one transaction at the time
-    if (env->m_transaction)
-        return 0;
-
+int bdb_start_transaction(const abl_db *abldb) {
     DB_TXN *tid = NULL;
     int err = 0;
-    if ((err = env->m_envHandle->txn_begin(env->m_envHandle, NULL, &tid, 0)) != 0) {
-        log_db_error(env->m_logContext, err, "starting transaction");
+    bdb_state *state = abldb->state;
+    if (!state || !state->m_environment)
+        return 1;
+    //for the moment we only support one transaction at the time
+    if (state->m_transaction)
+        return 0;
+
+    if ((err = state->m_environment->txn_begin(state->m_environment, NULL, &tid, 0)) != 0) {
+        log_db_error(err, "starting transaction");
         return err;
     }
-    env->m_transaction = tid;
+    state->m_transaction = tid;
     return err;
 }
 
-int commitTransaction(bdb_environment *env) {
-    if (!env || !env->m_envHandle)
+int bdb_commit_transaction(const abl_db *abldb) {
+    bdb_state *env = abldb->state;
+    if (!env || !env->m_environment)
         return 1;
     //if we are not in a transaction, just ignore it
     if (!env->m_transaction)
@@ -113,8 +107,9 @@ int commitTransaction(bdb_environment *env) {
     return err;
 }
 
-int abortTransaction(bdb_environment *env) {
-    if (!env || !env->m_envHandle)
+int bdb_abort_transaction(const abl_db *abldb) {
+    bdb_state *env = abldb->state;
+    if (!env || !env->m_environment)
         return 1;
     //if we are not in a transaction, just ignore it
     if (!env->m_transaction)
@@ -124,7 +119,6 @@ int abortTransaction(bdb_environment *env) {
     env->m_transaction = NULL;
     return err;
 }
-*/
 
 abl_db* abl_db_open() {
     if (!args || !args->db_home || !*args->db_home)
@@ -132,36 +126,42 @@ abl_db* abl_db_open() {
 
     int             err             = 0;
     abl_db          *db             = NULL;
-    bdb_environment *env            = NULL;
     bdb_state       *state          = NULL;
     DB              *host_handle    = NULL;
     DB              *user_handle    = NULL;
+    DB_ENV          *env            = NULL;
 
     if (create_environment(args->db_home, &env))
         goto open_fail;
-    if (db_create(&host_handle, env->m_envHandle, 0))
-        goto open_fail;
-    if (db_create(&user_handle, env->m_envHandle, 0))
-        goto open_fail;
-
-    if ((err = host_handle->open(host_handle, NULL, "host", "db", DB_BTREE, DB_CREATE|DB_AUTO_COMMIT|DB_MULTIVERSION, DBPERM)) != 0) {
-        goto open_fail;
-    }
-    if ((err = user_handle->open(user_handle, NULL, "user", "db", DB_BTREE, DB_CREATE|DB_AUTO_COMMIT|DB_MULTIVERSION, DBPERM)) != 0) {
-        goto open_fail;
-    }
-
-    log_debug("databases opened");
+    db = calloc(1,sizeof(abl_db));
+    if (db == NULL) goto open_fail;
 
     state = calloc(1,sizeof(bdb_state));
     if (state == NULL) goto open_fail;
+    db->state   = (void*) state;
+    state->m_environment = env;
+    state->m_transaction = NULL;
+
+    if (db_create(&host_handle, env, 0))
+        goto open_fail;
+    if (db_create(&user_handle, env, 0))
+        goto open_fail;
+
+    bdb_start_transaction((const abl_db*)db);
+    if ((err = host_handle->open(host_handle, state->m_transaction, "host", "db", DB_BTREE, DB_CREATE|DB_MULTIVERSION, DBPERM)) != 0) {
+        goto open_fail;
+    }
+    if ((err = user_handle->open(user_handle, state->m_transaction, "user", "db", DB_BTREE, DB_CREATE|DB_MULTIVERSION, DBPERM)) != 0) {
+        goto open_fail;
+    }
+    bdb_commit_transaction((const abl_db*)db);
+
+    log_debug("databases opened");
+
     state->m_hhandle = host_handle;
     state->m_uhandle = user_handle;
-    state->m_environment = env;
 
-    db = calloc(1,sizeof(abl_db));
-    if (db == NULL) goto open_fail;
-    db->state   = (void*) state;
+    printf("%s %p\n",__func__,state->m_transaction);//fireose
     db->close   = bdb_close;
     db->put     = bdb_put;
     db->get     = bdb_get;
@@ -169,8 +169,26 @@ abl_db* abl_db_open() {
     db->c_open  = bdb_c_open;
     db->c_close = bdb_c_close;
     db->c_get   = bdb_c_get;
+    db->start_transaction  = bdb_start_transaction;
+    db->commit_transaction = bdb_commit_transaction;
+    db->abort_transaction  = bdb_abort_transaction;
     return db;
 open_fail:
+    if (host_handle)
+        host_handle->close(host_handle,0);
+    if (user_handle)
+        user_handle->close(user_handle,0);
+    if (state && state->m_environment && state->m_transaction) {
+        // db exists if the above are true
+        bdb_abort_transaction(db);
+    }
+    if(state)
+        free(state);
+    if(db)
+        free(db);
+    if(env)
+        destroy_environment(env);
+
     log_db_error(err, "opening or creating database");
     return NULL;
 }
@@ -211,9 +229,9 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
     key.data = (void*)hostOrUser;
     key.size = strlen(hostOrUser);
 
-    //DB_TXN *tid = db->m_environment->m_transaction;
+    DB_TXN *tid = db->m_transaction;
 
-    err = db_handle->get(db_handle, NULL, &key, &dbtdata, 0);
+    err = db_handle->get(db_handle, tid, &key, &dbtdata, 0);
     /*Called with DB_DBT_USERMEM?  What was there wasn't enough*/
     if (err == DB_BUFFER_SMALL) {
         allocData = malloc(dbtdata.size);
@@ -223,7 +241,7 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
         dbtdata.ulen = dbtdata.size;
         dbtdata.size = 0;
         /* ...and try again. */
-        err = db_handle->get(db_handle, NULL, &key, &dbtdata, 0);
+        err = db_handle->get(db_handle, tid, &key, &dbtdata, 0);
     }
 
     if (err != 0 && err != DB_NOTFOUND) {
@@ -247,14 +265,16 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
 }
 
 int bdb_put(const abl_db *abldb, const char *hostOrUser, AuthState *hostOrUserState, ablObjectType type) {
-    bdb_state *db = abldb->state;
-    if (!db || !db->m_environment || !db->m_hhandle || !db->m_uhandle || !hostOrUser || !*hostOrUser || !hostOrUserState)
+    bdb_state *state = abldb->state;
+    if (!state || !state->m_environment || 
+        !state->m_hhandle || !state->m_uhandle || 
+        !hostOrUser || !*hostOrUser || !hostOrUserState)
         return 1;
     DB *db_handle = NULL;
     if ( type & HOST )
-        db_handle = db->m_hhandle;
+        db_handle = state->m_hhandle;
     else
-        db_handle = db->m_uhandle;
+        db_handle = state->m_uhandle;
 
 
     DBT key, data;
@@ -264,7 +284,7 @@ int bdb_put(const abl_db *abldb, const char *hostOrUser, AuthState *hostOrUserSt
     key.size = strlen(hostOrUser);
     data.data = hostOrUserState->m_data;
     data.size = hostOrUserState->m_usedSize;
-    int err = db_handle->put(db_handle, NULL, &key, &data, 0);
+    int err = db_handle->put(db_handle, state->m_transaction, &key, &data, 0);
     return err;
 }
 

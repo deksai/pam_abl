@@ -229,6 +229,12 @@ static int update_status(const abl_db *db, const char *object,
 
     *stateChanged = 0; //assume the state will not change
 
+    err = db->start_transaction(db);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return err;
+    }
+
     err = db->get(db, object, &objectState, type);
     
     //only update if we have a objectState (It is already in the database and no error)
@@ -249,6 +255,10 @@ static int update_status(const abl_db *db, const char *object,
         }
         destroyAuthState(objectState);
     }
+    if (err)
+        db->abort_transaction(db);
+    else
+        db->commit_transaction(db);
     return err;
 }
 
@@ -498,6 +508,13 @@ static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
         service = "";
 
     AuthState *objectState = NULL;
+
+    err = db->start_transaction(db);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return err;
+    }
+
     err = db->get(db, object, &objectState, type);
     if (!err && !objectState) {
         if (createEmptyState(CLEAR, &objectState)) {
@@ -518,6 +535,10 @@ static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
         }
         destroyAuthState(objectState);
     }
+    if (err)
+        db->abort_transaction(db);
+    else
+        db->commit_transaction(db);
     return err;
 }
 

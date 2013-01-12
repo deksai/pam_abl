@@ -26,15 +26,17 @@
 #include <db.h>
 
 typedef struct bdb_environment {
-    DB_ENV *m_envHandle;
-    DB_TXN *m_transaction;
+    DB_ENV *m_envHandle_disabled;
+    DB_TXN *m_transaction_disabled;
 } bdb_environment;
 
 typedef struct bdb_state {
     DB *m_uhandle;
     DB *m_hhandle;
     DBC *m_cursor;
-    bdb_environment *m_environment;
+    DB_ENV *m_environment;
+    DB_TXN *m_transaction;
+    //bdb_environment *m_environment;
 } bdb_state;
 
 /*
@@ -48,7 +50,7 @@ void log_db_error(int err, const char *what);
   Close a full environment.
   \note Do not use the env pointer anymore after calling this function
 */
-void destroy_environment(bdb_environment *env);
+void destroy_environment(DB_ENV *env);
 
 
 /*
@@ -58,7 +60,7 @@ void destroy_environment(bdb_environment *env);
   \return zero on success, otherwise non zero
   \note context can be a NULL ptr, do not delete context while the environment is still active
 */
-int create_environment(const char *home, bdb_environment **env);
+int create_environment(const char *home, DB_ENV **env);
 
 
 /*
@@ -123,5 +125,27 @@ int bdb_c_close(abl_db *abldb);
   \return zero on success, non zero otherwise
 */
 int bdb_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize);
+
+/*
+  Start a transaction on the given environment
+  \return zero on success, otherwise non zero
+  \note For the moment only on transaction can be active at the same time.
+  \note ALL database actions need to be wrapped in a transaction for them to work.
+*/
+int bdb_start_transaction(const abl_db *db);
+
+/*
+  End a transaction started on the environment applying all the changes
+  \return zero on success, otherwise non zero
+  \note calling this function on an environment with no transaction started sill succeed
+*/
+int bdb_commit_transaction(const abl_db *db);
+
+/*
+  End a transaction started on the environment discarding all the changes
+  \return zero on success, otherwise non zero
+  \note calling this function on an environment with no transaction started sill succeed
+*/
+int bdb_abort_transaction(const abl_db *db);
 
 #endif

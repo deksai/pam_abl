@@ -203,6 +203,12 @@ static int doshow(abl_db *db, ablObjectType type) {
     //Section header for output
     printf("Failed %s:\n", thing);
 
+    err = db->start_transaction(db);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return err;
+    }
+
     for (;;) {
         if (db->c_get(db, &key, &ksize, &data, &dsize))
             break;
@@ -267,6 +273,7 @@ static int doshow(abl_db *db, ablObjectType type) {
 
     /* Cleanup */
 doshow_fail:
+    db->commit_transaction(db);
     db->c_close(db);
     free(buf);
     return err;
@@ -290,6 +297,13 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
     }
 
     mention("Purging");
+
+    err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return err;
+    }
+
     if (err = abldb->c_open(abldb, type), 0 != err) {
         goto dopurge_fail;
     }
@@ -352,6 +366,10 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
     // Cleanup
 dopurge_fail:
     free(buf);
+    if (err)
+        abldb->abort_transaction(abldb);
+    else
+        abldb->commit_transaction(abldb);
     abldb->c_close(abldb);
     return err;
 }
@@ -374,6 +392,12 @@ static int doupdate(abl_db *abldb, ablObjectType type) {
         rule = args->host_rule;
     } else {
         rule = args->user_rule;
+    }
+
+    err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return err;
     }
 
     if (err = abldb->c_open(abldb, type), 0 != err) {
@@ -435,6 +459,10 @@ static int doupdate(abl_db *abldb, ablObjectType type) {
     // Cleanup
 doupdate_fail:
     free(buf);
+    if (err)
+        abldb->abort_transaction(abldb);
+    else
+        abldb->commit_transaction(abldb);
     abldb->c_close(abldb);
     return err;
 }
@@ -451,6 +479,12 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
 
     if (!abldb || !args)
         return 0;
+
+    err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return err;
+    }
 
     if (err = abldb->c_open(abldb, type), 0 != err) {
         goto whitelist_fail;
@@ -520,6 +554,10 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
     // Cleanup
 whitelist_fail:
     free(buf);
+    if (err)
+        abldb->abort_transaction(abldb);
+    else
+        abldb->commit_transaction(abldb);
     abldb->c_close(abldb);
     return err;
 }

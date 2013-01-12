@@ -18,6 +18,7 @@
  */
 
 #include "pam_abl.h"
+#include "log.h"
 #include "test.h"
 
 #include <stdlib.h>
@@ -130,6 +131,11 @@ static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, 
         printf("   Expected the reason to be %d, yet %d was returned.\n", (int)bReason, (int)info.blockReason);
     }
     AuthState *userState = NULL;
+    int err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return;
+    }
     if (abldb->get(abldb, user, &userState, USER))
         printf("   Could not retrieve the current state of the user.\n");
     if (userState) {
@@ -152,7 +158,7 @@ static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, 
     } else {
         printf("   Does the host not exist in the db?.\n");
     }
-    //config_free();
+    abldb->abort_transaction(abldb);
 }
 
 static void testCheckAttempt() {
@@ -216,7 +222,6 @@ static void testRecordAttempt() {
     char serviceBuffer[100];
     time_t currentTime = time(NULL);
 
-    //config_create();
     args->host_purge = 60*60*24; //1 day
     args->user_purge = 60*60*24; //1 day
 
@@ -243,6 +248,12 @@ static void testRecordAttempt() {
             if (record_attempt(abldb, &info))
                 printf("   Could not add an attempt.\n");
         }
+    }
+
+    int err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return;
     }
 
     for (y = 0; y < 10; ++y) {
@@ -292,9 +303,10 @@ static void testRecordAttempt() {
             destroyAuthState(hostState);
     }
 
+    abldb->commit_transaction(abldb);
+
     removeDir(TEST_DIR);
     abldb->close(abldb);
-    //config_free();
 }
 
 static void testRecordAttemptWhitelistHost() {
@@ -358,6 +370,12 @@ static void testRecordAttemptWhitelistHost() {
         }
     }
 
+    int err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return;
+    }
+
     for (y = 0; y < 10; ++y) {
         snprintf(&userBuffer[0], 100, "user_%d", y);
         snprintf(&serviceBuffer[0], 100, "service_%d", y);
@@ -399,9 +417,7 @@ static void testRecordAttemptWhitelistHost() {
     if (userState)
         printf("   We expected an empty state for the empty user\n");
 
-    //XXX closedb?
-    //destroyPamAblDbEnvironment(dbEnv);
-    //config_free();
+    abldb->commit_transaction(abldb);
     abldb->close(abldb);
     removeDir(TEST_DIR);
 }
@@ -431,6 +447,11 @@ static void testRecordAttemptPurge() {
 
     //we know in the db every 10 seconds an attempt was made, lets's see if it is purged enough
     //time_t logTime = tm - x*10;
+    int err = abldb->start_transaction(abldb);
+    if (err) {
+        log_error("starting transaction to %s.", __func__);
+        return;
+    }
     AuthState *userState = NULL;
     AuthState *hostState = NULL;
     if (abldb->get(abldb, info.user, &userState, USER))
@@ -446,8 +467,7 @@ static void testRecordAttemptPurge() {
             printf("   The current host state holds %d entries.\n", getNofAttempts(hostState));
         }
     }
-    //destroyPamAblDbEnvironment(dbEnv);
-    //config_free();
+    abldb->commit_transaction(abldb);
     abldb->close(abldb);
     if (userState)
         destroyAuthState(userState);

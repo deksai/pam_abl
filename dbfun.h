@@ -29,6 +29,9 @@ typedef struct abl_db {
     int (*c_open)(_abl_db *, ablObjectType);
     int (*c_close)(_abl_db *);
     int (*c_get)(_abl_db *,char **key,size_t *ksize,char **data,size_t *dsize);
+    int (*start_transaction)(const _abl_db *);
+    int (*commit_transaction)(const _abl_db *);
+    int (*abort_transaction)(const _abl_db *);
     void *state;
 } abl_db;
 
