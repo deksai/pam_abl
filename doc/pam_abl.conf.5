@@ -2,12 +2,12 @@
 .\"     Title: pam_abl.conf
 .\"    Author: Chris Tasma
 .\" Generator: DocBook XSL Stylesheets v1.77.1 <http://docbook.sf.net/>
-.\"      Date: 10/29/2012
+.\"      Date: 01/14/2013
 .\"    Manual: Linux-PAM Manual
 .\"    Source: GNU
 .\"  Language: English
 .\"
-.TH "PAM_ABL\&.CONF" "5" "10/29/2012" "GNU" "Linux\-PAM Manual"
+.TH "PAM_ABL\&.CONF" "5" "01/14/2013" "GNU" "Linux\-PAM Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -196,11 +196,25 @@ These are the rules which determine the circumstances under which accounts are a
 .PP
 \fBhost_clr_cmd, host_blk_cmd, user_clr_cmd, user_blk_cmd\fR
 .RS 4
+Deprecated for security reasons\&. Please use the corresponding safer option: host_clear_cmd, host_block_cmd, user_clear_cmd, user_block_cmd
+.RE
+.PP
+\fBhost_clear_cmd, host_block_cmd, user_clear_cmd, user_block_cmd\fR
+.RS 4
 These specify commands that will run during a check when an item switches state since its last check\&.
 
-host_clr_cmd and user_clr_cmd will run if the host or user is currently allowed access\&. host_blk_cmd and user_blk_cmd are run if the host or user is currentlybeing blocked by their respective rules\&. If no command is specified, no action is taken\&.
+host_clear_cmd and user_clear_cmd will run if the host or user is currently allowed access\&. host_block_cmd and user_block_cmd are run if the host or user is currently being blocked by their respective rules\&.
 
-Within the commands, you can specify substitutions with %h, %u and %s, which will be replace with the host name, user name and service currently being checked\&. If there isn\(cqt enough information to fulfill the requested substitutions (eg\&. running the pam_abl tool without specifying all the necessary fields), the command will simply not run\&.
+Within the commands, you can specify substitutions with %h, %u and %s, which will be replace with the host name, user name and service currently being checked\&. For security reasons we do not run the command using the system call\&. We use the more secure fork/exec solution\&. This means that you can\(cqt specify input and output redirections\&.
+
+Note that this also means that no escaping is done, so if you call a shell here, you might introduce a security problem\&.
+
+The commands should follow a special syntax (you can use the command line tool with the \-d option to test the parsing of your commands) where the command and it\(cqs different arguments need to be enclosed in [] and all text not enclosed in [] is simply ignored\&. For example: "[/usr/bin/logger] ignored [block] [user] [%u]" will run the command "/usr/bin/logger block user <current user>"\&. If you want to specify a
+\fI[\fR,
+\fI]\fR
+or
+\fI\e\fR, you need to escape them with a
+\fI\e\fR\&.
 .RE
 .PP
 \fBhost_whitelist, user_whitelist\fR
@@ -218,11 +232,11 @@ debug
 host_db=/var/lib/abl/hosts\&.db
 host_purge=2d
 host_rule=*:10/1h,30/1d
-host_blk_cmd=iptables \-I INPUT \-s %h \-j DROP
+host_block_cmd=[/sbin/iptables] [\-I] [INPUT] [\-s] [%h] [\-j] [DROP]
 user_db=/var/lib/abl/users\&.db
 user_purge=2d
 user_rule=!root:10/1h,30/1d
-user_clr_cmd=logger This is a pointless command! user: %u host: %h service: %s
+user_clear_cmd=[/usr/bin/logger] [block] [user] [%u]
 .fi
 .if n \{\
 .RE

@@ -2,12 +2,12 @@
 .\"     Title: pam_abl
 .\"    Author: Chris Tasma
 .\" Generator: DocBook XSL Stylesheets v1.77.1 <http://docbook.sf.net/>
-.\"      Date: 10/29/2012
+.\"      Date: 01/14/2013
 .\"    Manual: Linux-PAM Manual
 .\"    Source: GNU
 .\"  Language: English
 .\"
-.TH "PAM_ABL" "8" "10/29/2012" "GNU" "Linux\-PAM Manual"
+.TH "PAM_ABL" "8" "01/14/2013" "GNU" "Linux\-PAM Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -57,6 +57,10 @@ T}:T{
 \fIDescription\fR
 T}
 .T&
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -205,17 +209,37 @@ T}:T{
 Host block command
 T}:T{
 .sp
-Command that should be run when a host is checked, and is currently blocked\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+Deprecated for security reasons\&. Please use host_block_cmd
 T}
 T{
 .sp
 \fBhost_clr_cmd\fR
 T}:T{
 .sp
+Host clear command
+T}:T{
+.sp
+Deprecated for security reasons\&. Please use host_clear_cmd
+T}
+T{
+.sp
+\fBhost_block_cmd\fR
+T}:T{
+.sp
 Host block command
 T}:T{
 .sp
-Command that should be run when a host is checked, and is currently clear\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+Command that should be run when a host is checked, and is currently blocked\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. Please see the manpage of pam_abl\&.conf for the correct syntax\&.
+T}
+T{
+.sp
+\fBhost_clear_cmd\fR
+T}:T{
+.sp
+Host clear command
+T}:T{
+.sp
+Command that should be run when a host is checked, and is currently clear\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. Please see the manpage of pam_abl\&.conf for the correct syntax\&.
 T}
 T{
 .sp
@@ -262,20 +286,40 @@ T{
 \fBuser_blk_cmd\fR
 T}:T{
 .sp
-Host block command
+User block command
 T}:T{
 .sp
-Command that should be run when a user is checked, and is currently blocked\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+Deprecated for security reasons\&. Please use user_block_cmd
 T}
 T{
 .sp
 \fBuser_clr_cmd\fR
 T}:T{
 .sp
-Host block command
+User clear command
 T}:T{
 .sp
-Command that should be run when a user is checked, and is currently clear\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&. If substitution is called for, but there is no iformation for that field, the command will not run\&.
+Deprecated for security reasons\&. Please use clear_block_cmd
+T}
+T{
+.sp
+\fBuser_blk_cmd\fR
+T}:T{
+.sp
+User block command
+T}:T{
+.sp
+Command that should be run when a user is checked, and is currently blocked\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&.
+T}
+T{
+.sp
+\fBuser_clr_cmd\fR
+T}:T{
+.sp
+User block command
+T}:T{
+.sp
+Command that should be run when a user is checked, and is currently clear\&. Within the command, the strings %u, %h and %s are substituted with username, host and service\&. Not all need to be used\&.
 T}
 .TE
 .sp 1
