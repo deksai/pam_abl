@@ -550,13 +550,16 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
 
     if (verbose && del > 0)
         printf("Deleted %d item%s\n", del, del == 1 ? "" : "s");
+    
+   //Need to reset this lest the last c_get cause the transaction to
+   //fail (err = NOT_FOUND or NONE_LEFT or something like that).
+    err = 0;
 
-    // Cleanup
 whitelist_fail:
     free(buf);
     if (err)
         abldb->abort_transaction(abldb);
-    else
+    else 
         abldb->commit_transaction(abldb);
     abldb->c_close(abldb);
     return err;
