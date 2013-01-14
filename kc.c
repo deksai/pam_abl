@@ -75,6 +75,9 @@ abl_db* abl_db_open() {
     db->c_open  = kc_c_open;
     db->c_close = kc_c_close;
     db->c_get   = kc_c_get;
+    db->start_transaction = kc_start_transaction;
+    db->commit_transaction = kc_commit_transaction;
+    db->abort_transaction = kc_abort_transaction;
     return db;
 open_fail:
     if (host_handle)
@@ -212,4 +215,55 @@ int kc_c_close(abl_db *abldb) {
         kccurdel(db->cursor);
     }
     return 0;
+}
+
+int kc_start_transaction(const abl_db *abldb) {
+    int success = 0;
+    kc_state *state = abldb->state;
+    if (!state || !state->host || !state->user)
+        return 1;
+    if (state->transaction)
+        return 0;
+
+    success =  kcdbbegintran(state->host,0);
+    if (!success) return 1;
+    success = kcdbbegintran(state->user,0);
+    if (!success) return 1;
+
+    state->transaction = 1;
+    return 0;
+}
+
+int kc_commit_transaction(const abl_db *abldb) {
+    int success = 0;
+    kc_state *state = abldb->state;
+    if (!state || !state->host || !state->user)
+        return 1;
+    if (!state->transaction)
+        return 0;
+
+    success = kcdbendtran(state->host, 1);
+    if (!success) return 1;
+    success = kcdbendtran(state->user, 1);
+    if (!success) return 1;
+
+    state->transaction = 0;
+    return 1;
+}
+
+int kc_abort_transaction(const abl_db *abldb) {
+    int success = 0;
+    kc_state *state = abldb->state;
+    if (!state || !state->host || !state->user)
+        return 1;
+    if (!state->transaction)
+        return 0;
+
+    success =  kcdbendtran(state->host, 0);
+    if (!success) return 1;
+    success &= kcdbendtran(state->user, 0);
+    if (!success) return 1;
+
+    state->transaction = 0;
+    return 1;
 }

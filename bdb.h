@@ -41,7 +41,7 @@ typedef struct bdb_state {
 
 /*
   Log a Berkeley db error. This will also lookup the string representation of err
-  Make sure err is a value returned by a Berkeley db function
+  Make sure err is a value returned by a Kytoto Cabinet db function
 */
 void log_db_error(int err, const char *what);
 
@@ -130,7 +130,6 @@ int bdb_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsi
   Start a transaction on the given environment
   \return zero on success, otherwise non zero
   \note For the moment only on transaction can be active at the same time.
-  \note ALL database actions need to be wrapped in a transaction for them to work.
 */
 int bdb_start_transaction(const abl_db *db);
 
