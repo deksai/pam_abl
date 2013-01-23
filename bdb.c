@@ -55,13 +55,20 @@ int create_environment(const char *home, DB_ENV **env) {
         if ((err = dbenv->set_lk_detect(dbenv, DB_LOCK_DEFAULT)) != 0) {
             log_db_error(err, "setting lock detection.");
         }
-    }
-    err = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
-    if (err != 0) {
-        log_db_error(err, "setting automatic log file removal.");
-    }
-    if ((err = dbenv->txn_checkpoint(dbenv, CHECKPOINTSIZE, 0, 0)) != 0) {
-        log_db_error(err, "setting the automatic checkpoint option.");
+
+#if ((DB_VERSION_MAJOR >= 5)||(DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 7))
+        ret = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
+#else
+        ret = dbenv->set_flags(dbenv, DB_LOG_AUTOREMOVE, 1);
+#endif
+
+        err = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
+        if (err != 0) {
+            log_db_error(err, "setting automatic log file removal.");
+        }
+        if ((err = dbenv->txn_checkpoint(dbenv, CHECKPOINTSIZE, 0, 0)) != 0) {
+            log_db_error(err, "setting the automatic checkpoint option.");
+        }
     }
 
     *env = dbenv;
@@ -378,6 +385,12 @@ int bdb_c_close(abl_db *abldb) {
     int err = 0;
     bdb_state *db = abldb->state;
     if (db->m_cursor) {
+#if DB_VERSION_MAJOR < 5
+        err = db->m_cursor->c_close(db->m_cursor);
+#else
+        err = db->m_cursor->close(db->m_cursor);
+#endif
+
         err = db->m_cursor->close(db->m_cursor);
         if (err) log_db_error(err, "Closing cursor");
     }
