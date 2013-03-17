@@ -51,8 +51,7 @@ static void cleanup(pam_handle_t *pamh, void *data, int err) {
         }
         if (context->dbEnv)
             destroyPamAblDbEnvironment(context->dbEnv);
-        if (context->attemptInfo)
-            free(context->attemptInfo);
+        destroyAblInfo(context->attemptInfo);
         if (context->args)
             config_free(context->args);
         if (context->logContext)
@@ -66,6 +65,9 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     (void)(flags);
     int err = PAM_BUF_ERR;
     abl_context *context = NULL;
+    const char *pUser = NULL;
+    const char *pService = NULL;
+    const char *pHost = NULL;
 
     err = pam_get_data(pamh, MODULE_NAME, (const void **)(&context));
     if (err != PAM_SUCCESS) {
@@ -79,14 +81,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             goto psa_fail;
         }
         memset(context, 0, sizeof(abl_context));
-        context->attemptInfo = malloc(sizeof(abl_info));
+        context->attemptInfo = createAblInfo();
         context->args = config_create();
         context->logContext = createLogContext();
         if (!context->attemptInfo || !context->args || !context->logContext) {
             err = PAM_BUF_ERR;
             goto psa_fail;
         }
-        memset(context->attemptInfo, 0, sizeof(abl_info));
 
         err = config_parse_args(argc, argv, context->args, context->logContext);
         if (err != 0) {
@@ -116,23 +117,25 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     }
 
     //get the user again, it can be that another module has changed the username or something else
-    err = pam_get_item(pamh, PAM_USER, (const void **) &context->attemptInfo->user);
+    err = pam_get_item(pamh, PAM_USER, (const void **) &pUser);
     if (err != PAM_SUCCESS) {
         log_pam_error(context->logContext, pamh, err, "getting PAM_USER");
         goto psa_fail;
     }
 
-    err = pam_get_item(pamh, PAM_SERVICE, (const void **) &context->attemptInfo->service);
+    err = pam_get_item(pamh, PAM_SERVICE, (const void **) &pService);
     if (err != PAM_SUCCESS) {
         log_pam_error(context->logContext, pamh, err, "getting PAM_SERVICE");
         goto psa_fail;
     }
 
-    err = pam_get_item(pamh, PAM_RHOST, (const void **) &context->attemptInfo->host);
+    err = pam_get_item(pamh, PAM_RHOST, (const void **) &pHost);
     if (err != PAM_SUCCESS) {
         log_pam_error(context->logContext, pamh, err, "getting PAM_RHOST");
         goto psa_fail;
     }
+    //this will also delete the old info that was already stored
+    setInfo(context->attemptInfo, pUser, pHost, pService);
 
     BlockState bState = check_attempt(context->dbEnv, context->args, context->attemptInfo, context->logContext);
     if (bState == BLOCKED) {
@@ -146,8 +149,7 @@ psa_fail:
     if (context) {
         if (context->dbEnv)
             destroyPamAblDbEnvironment(context->dbEnv);
-        if (context->attemptInfo)
-            free(context->attemptInfo);
+        destroyAblInfo(context->attemptInfo);
         if (context->args)
             config_free(context->args);
         if (context->logContext)

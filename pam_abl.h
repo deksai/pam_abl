@@ -32,17 +32,21 @@ typedef struct PamAblDbEnv {
 
 typedef struct {
     BlockReason blockReason;
-    const char *user;
-    const char *host;
-    const char *service;
+    char *user;
+    char *host;
+    char *service;
 } abl_info;
+
+abl_info *createAblInfo();
+void destroyAblInfo(abl_info *info);
+void setInfo(abl_info *info, const char *user, const char *host, const char *service);
 
 /*
   Given a full configuration open the required environment and databases
   \param args The config with all the db params
   \param logContext The loggin context to use when reporting errors/warnings/...
   \return a valid environment on success, otherwise a nullptr
-  \note f something goes wrong, error messages are written to the logContext
+  \note if something goes wrong, error messages are written to the logContext
 */
 PamAblDbEnv *openPamAblDbEnvironment(abl_args *args, log_context *logContext);
 

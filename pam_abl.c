@@ -33,6 +33,40 @@
 #define DB_NAME "state"
 #define COMMAND_SIZE 1024
 
+abl_info *createAblInfo() {
+    abl_info *retValue = malloc(sizeof(abl_info));
+    if (retValue)
+        memset(retValue, 0, sizeof(abl_info));
+    return retValue;
+}
+
+void destroyAblInfo(abl_info *info) {
+    //setting it with NULL effectively frees the memory
+    setInfo(info, NULL, NULL, NULL);
+    if (info)
+        free(info);
+}
+
+void setInfo(abl_info *info, const char *user, const char *host, const char *service) {
+    if (!info)
+        return;
+    if (info->user)
+        free(info->user);
+    if (info->host)
+        free(info->host);
+    if (info->service)
+        free(info->service);
+    info->user = NULL;
+    info->host = NULL;
+    info->service = NULL;
+    if (user)
+        info->user = strdup(user);
+    if (host)
+        info->host = strdup(host);
+    if (service)
+        info->service = strdup(service);
+}
+
 /*
  * Substitute the user/host/service in the given string
  * \param str: The string where we need to substitute in.

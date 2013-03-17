@@ -44,8 +44,8 @@ typedef enum {
 
 static int relative  = 0;
 static int verbose   = 0;
-const char *users[MAXNAMES];
-const char *hosts[MAXNAMES];
+char *users[MAXNAMES];
+char *hosts[MAXNAMES];
 CommandType command=SHOW;
 int num_users=0;
 int num_hosts=0;
@@ -547,7 +547,7 @@ doupdate_fail:
     return err;
 }
 
-static int whitelist(const abl_args *args, PamAblDbEnv *dbEnv, int isHost, const char **permit, int count, log_context *logContext) {
+static int whitelist(const abl_args *args, PamAblDbEnv *dbEnv, int isHost, char **permit, int count, log_context *logContext) {
     DB *db = NULL;
     int err = 0;
     DBT key, data;
