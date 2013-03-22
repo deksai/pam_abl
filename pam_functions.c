@@ -22,6 +22,7 @@
 #include "dbfun.h"
 #include "log.h"
 
+#include <dlfcn.h>
 #include <stdlib.h>
 #include <string.h>
 #include <security/pam_modules.h>
@@ -95,10 +96,19 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         }
         /* We now keep the database open from the beginning to avoid the cost
          * of opening them repeatedly. */
-        /// XXX make a pam_abl_open_db thingy
-        //context->dbEnv = openPamAblDbEnvironment(context->args, context->logContext);
+        void *dblib = NULL;
+        abl_db *(*db_open)();
+
+        dblib = dlopen(args->db_module, RTLD_LAZY|RTLD_GLOBAL);
+        if (!dblib) {
+            log_error("%s opening database module",dlerror());
+            goto psa_fail;
+        }
+        dlerror();
+        db_open = dlsym(dblib, "abl_db_open");
+        context->abldb = db_open(args->db_home);
         if (!context->abldb) {
-            log_error("The database environment could not be opened");
+            log_error("The database environment could not be opened %p",context->abldb);
             goto psa_fail;
         }
 
@@ -149,7 +159,7 @@ psa_fail:
         if (context->attemptInfo)
             free(context->attemptInfo);
         if (context->args)
-            config_free(context->args);
+            config_free();
         free(context);
         //it can be that we already set the data pointer, let's remove it
         pam_set_data(pamh, MODULE_NAME, NULL, NULL);
