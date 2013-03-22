@@ -43,6 +43,6 @@ typedef struct abl_db {
   Given a full configuration open the required environment and databases
   \return a valid abl_db on success, otherwise a nullptr
 */
-abl_db* abl_db_open();
+abl_db* abl_db_open(const char *db_home);
 
 #endif

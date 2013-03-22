@@ -57,9 +57,9 @@ int create_environment(const char *home, DB_ENV **env) {
         }
 
 #if ((DB_VERSION_MAJOR >= 5)||(DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 7))
-        ret = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
+        dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
 #else
-        ret = dbenv->set_flags(dbenv, DB_LOG_AUTOREMOVE, 1);
+        dbenv->set_flags(dbenv, DB_LOG_AUTOREMOVE, 1);
 #endif
 
         err = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
@@ -127,8 +127,8 @@ int bdb_abort_transaction(const abl_db *abldb) {
     return err;
 }
 
-abl_db* abl_db_open() {
-    if (!args || !args->db_home || !*args->db_home)
+abl_db* abl_db_open(const char *db_home) {
+    if ( !db_home )
         return NULL;
 
     int             err             = 0;
@@ -138,7 +138,7 @@ abl_db* abl_db_open() {
     DB              *user_handle    = NULL;
     DB_ENV          *env            = NULL;
 
-    if (create_environment(args->db_home, &env))
+    if (create_environment(db_home, &env))
         goto open_fail;
     db = calloc(1,sizeof(abl_db));
     if (db == NULL) goto open_fail;

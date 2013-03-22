@@ -768,7 +768,7 @@ int main(int argc, char **argv) {
     }
     dlerror();
     db_open = dlsym(dblib, "abl_db_open");
-    abldb = db_open();
+    abldb = db_open(args->db_home);
     if (!abldb) {
         return 1;
     }

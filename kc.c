@@ -30,8 +30,8 @@ void log_db_error(int err, const char *what) {
     log_error("%s (%d) while %s",kcecodename(err), err, what);
 }
 
-abl_db* abl_db_open() {
-    if (!args || !args->db_home || !*args->db_home)
+abl_db* abl_db_open(const char *db_home) {
+    if ( !db_home )
         return NULL;
 
     int       err             = 0;
@@ -45,13 +45,13 @@ abl_db* abl_db_open() {
     host_handle = kcdbnew();
     user_handle = kcdbnew();
 
-    bytes = snprintf(path, sizeof(path), "%s/host.kch",args->db_home);
+    bytes = snprintf(path, sizeof(path), "%s/host.kch", db_home);
     if (sizeof(path) == bytes) goto open_fail;
     if (!kcdbopen(host_handle, path, KCOWRITER | KCOCREATE | KCOAUTOTRAN)) {
         err = kcdbecode(host_handle);
         goto open_fail;
     }
-    bytes = snprintf(path, sizeof(path), "%s/user.kch",args->db_home);
+    bytes = snprintf(path, sizeof(path), "%s/user.kch", db_home);
     if (sizeof(path) == bytes) goto open_fail;
     if (!kcdbopen(user_handle, path, KCOWRITER | KCOCREATE | KCOAUTOTRAN)) {
         err = kcdbecode(user_handle);
