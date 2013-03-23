@@ -36,6 +36,25 @@ typedef struct abl_context {
     abl_db       *abldb;
 } abl_context;
 
+static int setup_db(abl_context *context) {
+    void *dblib = NULL;
+    abl_db *(*db_open)();
+
+    dblib = dlopen(args->db_module, RTLD_LAZY|RTLD_GLOBAL);
+    if (!dblib) {
+        log_error("%s opening database module",dlerror());
+        return -1;
+    }
+    dlerror();
+    db_open = dlsym(dblib, "abl_db_open");
+    context->abldb = db_open(args->db_home);
+    if (!context->abldb) {
+        log_error("The database environment could not be opened %p",context->abldb);
+        return -1;
+    }
+    return 0;
+}
+
 static void cleanup(pam_handle_t *pamh, void *data, int err) {
     (void)(pamh);
     //if we are replacing our data pointer, ignore the cleanup.
@@ -48,6 +67,7 @@ static void cleanup(pam_handle_t *pamh, void *data, int err) {
         log_debug("In cleanup, err is %08x", err);
 
         if (err) {
+            setup_db(context);
             int recordResult = record_attempt(context->abldb, context->attemptInfo);
             log_debug("record returned %d", recordResult);
         }
@@ -94,23 +114,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             log_error("Could not parse the config.");
             goto psa_fail;
         }
-        /* We now keep the database open from the beginning to avoid the cost
-         * of opening them repeatedly. */
-        void *dblib = NULL;
-        abl_db *(*db_open)();
 
-        dblib = dlopen(args->db_module, RTLD_LAZY|RTLD_GLOBAL);
-        if (!dblib) {
-            log_error("%s opening database module",dlerror());
+        err = setup_db(context);
+        if (err != 0) 
             goto psa_fail;
-        }
-        dlerror();
-        db_open = dlsym(dblib, "abl_db_open");
-        context->abldb = db_open(args->db_home);
-        if (!context->abldb) {
-            log_error("The database environment could not be opened %p",context->abldb);
-            goto psa_fail;
-        }
 
         err = pam_set_data(pamh, MODULE_NAME, context, cleanup);
         if (err != PAM_SUCCESS) {
@@ -121,6 +128,9 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         //we have a previous data pointer. We will ASSUME that it was from a previous failed attempt
         //a good example is sshd, when you try to login, you are given 3 attempts, so this function
         //can be called up to three times before the cleanup function is called.
+        err = setup_db(context);
+        if (err != 0) 
+            goto psa_fail;
         int recordResult = record_attempt(context->abldb, context->attemptInfo);
         log_debug("record from authenticate returned %d", recordResult);
     }
@@ -145,6 +155,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     }
 
     BlockState bState = check_attempt(context->abldb, context->attemptInfo);
+    context->abldb->close(context->abldb);
     if (bState == BLOCKED) {
         log_info("Blocking access from %s to service %s, user %s", context->attemptInfo->host, context->attemptInfo->service, context->attemptInfo->user);
         return PAM_AUTH_ERR;
