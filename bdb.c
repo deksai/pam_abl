@@ -391,7 +391,6 @@ int bdb_c_close(abl_db *abldb) {
         err = db->m_cursor->close(db->m_cursor);
 #endif
 
-        err = db->m_cursor->close(db->m_cursor);
         if (err) log_db_error(err, "Closing cursor");
     }
     return err;
