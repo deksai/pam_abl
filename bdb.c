@@ -168,7 +168,6 @@ abl_db* abl_db_open(const char *db_home) {
     state->m_hhandle = host_handle;
     state->m_uhandle = user_handle;
 
-    printf("%s %p\n",__func__,state->m_transaction);//fireose
     db->close   = bdb_close;
     db->put     = bdb_put;
     db->get     = bdb_get;
