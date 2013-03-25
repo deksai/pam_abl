@@ -82,8 +82,6 @@ abl_db* abl_db_open(const char *db_home) {
 open_fail:
     if (host_handle)
         kcdbdel(host_handle);
-    if (host_handle)
-        kcdbdel(host_handle);
     log_db_error(err, "opening or creating database");
     return NULL;
 }
