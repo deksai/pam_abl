@@ -165,9 +165,9 @@ void testConfig() {
     testWithEscapeChars();
     printf(" Starting testEscapeBracket.\n");
     testEscapeBracket();
-    printf(" Starting testMultipleOpen.  Expect errors...\n");
+    printf(" Starting testMultipleOpen.\n");
     testMultipleOpen();
-    printf(" Starting testNoClosing.  Expect errors...\n");
+    printf(" Starting testNoClosing.\n");
     testNoClosing();
     printf(" Starting testEmptyBrackets.\n");
     testEmptyBrackets();

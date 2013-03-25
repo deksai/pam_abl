@@ -20,6 +20,7 @@
 #include "config.h"
 #include "test.h"
 #include "dbfun.h"
+#include "log.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -76,8 +77,9 @@ int main(int argc, const char *argv[]) {
     config_create();
     args->db_module = argv[1];
     printf("%s",args->db_module);
+    log_quiet_mode = 1;
     runTypeTests();
-    //runDatabaseTests();
+	//runDatabaseTests();
     runtRuleTests();
     testAbl();
     testExternalCommand(argv[0]);

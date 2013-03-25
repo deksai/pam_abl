@@ -69,4 +69,6 @@ void log_debug(const char *format, ...);
 void log_pam_error(pam_handle_t *handle, int err, const char *what);
 #endif
 
+int log_quiet_mode;
+
 #endif

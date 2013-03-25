@@ -31,18 +31,13 @@
 
 #define UNUSED(x) (void)(x)
 
-//XXX unused everywhere
-//log_context *createLogContext() {
-//    log_context *retValue = malloc(sizeof(log_context));
-//    retValue->debug = 0;
-//    return retValue;
-//}
-
-//void destroyLogContext(log_context *context) {
-//    free(context);
-//}
+//pure for testing. We expect to get errors during testing
+//we should not complain about them
+int log_quiet_mode = 0;
 
 static void log_out(int pri, const char *format, ...) {
+    if (log_quiet_mode)
+        return;
     va_list ap;
     va_start(ap, format);
 #if defined(TEST) || defined(TOOLS)
@@ -68,6 +63,8 @@ void log_sys_error(int err, const char *what) {
 }
 
 void log_info(const char *format, ...) {
+    if (log_quiet_mode)
+        return;
     va_list ap;
     va_start(ap, format);
 #if defined(TEST) || defined(TOOLS)
@@ -83,6 +80,8 @@ void log_info(const char *format, ...) {
 }
 
 void log_error(const char *format, ...) {
+    if (log_quiet_mode)
+        return;
     va_list ap;
     va_start(ap, format);
 
@@ -102,6 +101,8 @@ void log_error(const char *format, ...) {
 }
 
 void log_warning(const char *format, ...) {
+    if (log_quiet_mode)
+        return;
     va_list ap;
     va_start(ap, format);
 #if defined(TEST) || defined(TOOLS)
@@ -117,6 +118,8 @@ void log_warning(const char *format, ...) {
 }
 
 void log_debug(const char *format, ...) {
+    if (log_quiet_mode)
+        return;
     va_list ap;
     va_start(ap, format);
     if (args != NULL && args->debug) {
