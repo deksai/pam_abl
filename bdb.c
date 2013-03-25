@@ -41,7 +41,7 @@ int create_environment(const char *home, DB_ENV **env) {
     DB_ENV *dbenv = NULL;
 
     if ((err = db_env_create(&dbenv, 0)) != 0) {
-    	log_db_error(err, "creating environment object");
+        log_db_error(err, "creating environment object");
         return err;
     }
     dbenv->set_errpfx(dbenv, "pam_abl");
