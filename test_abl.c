@@ -53,12 +53,16 @@ static int setupTestEnvironment(abl_db **_abldb) {
     }
     dlerror();
     db_open = dlsym(dblib, "abl_db_open");
+    if (!db_open) {
+        printf("Could not load the \"abl_db_open\" function\n");
+        return 1;
+    }
     *_abldb = db_open();
-    if (!_abldb) {
+    abl_db *abldb = *_abldb;
+    if (!abldb) {
         printf("Could not open database\n");
         return 1;
     }
-    abl_db *abldb = *_abldb;
 
     int i = 0;
     for (; i < 20; ++i) {
@@ -212,7 +216,7 @@ static void testCheckAttempt() {
     checkAttempt(abldb, "bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED);
 
     abldb->close(abldb);
-    removeDir(TEST_DIR);
+//    removeDir(TEST_DIR);
 }
 
 static void testRecordAttempt() {
@@ -305,7 +309,7 @@ static void testRecordAttempt() {
 
     abldb->commit_transaction(abldb);
 
-    removeDir(TEST_DIR);
+//    removeDir(TEST_DIR);
     abldb->close(abldb);
 }
 
@@ -419,7 +423,7 @@ static void testRecordAttemptWhitelistHost() {
 
     abldb->commit_transaction(abldb);
     abldb->close(abldb);
-    removeDir(TEST_DIR);
+//    removeDir(TEST_DIR);
 }
 
 static void testRecordAttemptPurge() {
