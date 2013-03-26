@@ -128,7 +128,7 @@ int bdb_abort_transaction(const abl_db *abldb) {
 }
 
 abl_db* abl_db_open(const char *db_home) {
-    if ( !db_home )
+    if ( !db_home || !*db_home )
         return NULL;
 
     int             err             = 0;

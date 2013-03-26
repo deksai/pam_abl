@@ -31,7 +31,7 @@ void log_db_error(int err, const char *what) {
 }
 
 abl_db* abl_db_open(const char *db_home) {
-    if ( !db_home )
+    if ( !db_home || ! *db_home )
         return NULL;
 
     int       err             = 0;
@@ -82,6 +82,8 @@ abl_db* abl_db_open(const char *db_home) {
 open_fail:
     if (host_handle)
         kcdbdel(host_handle);
+    if (user_handle)
+        kcdbdel(user_handle);
     log_db_error(err, "opening or creating database");
     return NULL;
 }
@@ -89,11 +91,18 @@ open_fail:
 void kc_close(abl_db *abldb) {
     //if (abl_db && db && db->host && db->user) {
         kc_state *db = abldb->state;
-        kcdbclose(db->host);
-        kcdbclose(db->user);
-        kcdbdel(db->host);
-        kcdbdel(db->user);
-        free(db);
+        if (db) {
+            if (db->host) {
+                kcdbclose(db->host);
+                kcdbdel(db->host);
+            }
+            if (db->user) {
+                kcdbclose(db->user);
+                kcdbdel(db->user);
+            }
+            free(db);
+            abldb->state = NULL;
+        }
         free(abldb);
     //}
 }
