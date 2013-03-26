@@ -57,7 +57,7 @@ static int setupTestEnvironment(abl_db **_abldb) {
         printf("Could not load the \"abl_db_open\" function\n");
         return 1;
     }
-    *_abldb = db_open();
+    *_abldb = db_open(args->db_home);
     abl_db *abldb = *_abldb;
     if (!abldb) {
         printf("Could not open database\n");
@@ -804,6 +804,7 @@ static void testCommand(const char *cmd, int exitCode) {
     if (result != exitCode) {
         printf("   ablExec exit code: \"%d\" != \"%d\"\n", result, exitCode);
     }
+    free(cmdArr);
 }
 
 void testExternalCommand(const char *cmd) {

@@ -79,8 +79,8 @@ int main(int argc, const char *argv[]) {
     printf("%s",args->db_module);
     log_quiet_mode = 1;
     runTypeTests();
-	//runDatabaseTests();
-    runtRuleTests();
+    //runDatabaseTests();
+    runRuleTests();
     testAbl();
     testExternalCommand(argv[0]);
     testRunCommand();

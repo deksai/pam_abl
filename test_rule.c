@@ -33,6 +33,7 @@ static void testRuleNoAttempts() {
     }
     if (rule_test("*:10/1s", "user", "service", state, 10) == BLOCKED)
         printf("   No attempts should never match.\n");
+    destroyAuthState(state);
 }
 
 static void testEmptyRule() {
@@ -50,6 +51,7 @@ static void testEmptyRule() {
         printf("   The empty rule matched.\n");
     if (rule_test(NULL, "user", "service", state, 5) == BLOCKED)
         printf("   The empty rule matched.\n");
+    destroyAuthState(state);
 }
 
 static void testNoMatch() {
@@ -67,6 +69,7 @@ static void testNoMatch() {
         printf("   The rule matched.\n");
     if (rule_test("*:10/8s", "user", "service", state, 10) == BLOCKED)
         printf("   The rule matched.\n");
+    destroyAuthState(state);
 }
 
 static void testMatch() {
@@ -84,6 +87,7 @@ static void testMatch() {
         printf("   The rule did not match.\n");
     if (rule_test("*:3/10s", "user", "service", state, 10) == CLEAR)
         printf("   The rule did not match.\n");
+    destroyAuthState(state);
 }
 
 static void testMatchService() {
@@ -101,6 +105,7 @@ static void testMatchService() {
         printf("   The special service rule did not match.\n");
     if (rule_test("*/Service1:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
         printf("   The rule matched.\n");
+    destroyAuthState(state);
 }
 
 static void testNoService() {
@@ -118,6 +123,7 @@ static void testNoService() {
         printf("   The rule matched.\n");
     if (rule_test("*:5/1h", "MyUser", NULL, state, 10) == CLEAR)
         printf("   The rule dit not match.\n");
+    destroyAuthState(state);
 }
 
 static void testMatchUser() {
@@ -135,6 +141,7 @@ static void testMatchUser() {
         printf("   The rule did not match.\n");
     if (rule_test("user2:1/1h *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
         printf("   The rule did match.\n");
+    destroyAuthState(state);
 }
 
 static void testInvert() {
@@ -152,9 +159,10 @@ static void testInvert() {
         printf("   The rule did match.\n");
     if (rule_test("MyUser:1/10s !MyUser:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
         printf("   The rule did not match.\n");
+    destroyAuthState(state);
 }
 
-void runtRuleTests() {
+void runRuleTests() {
     printf("Rule test start.\n");
     printf(" Starting testRuleNoAttempts.\n");
     testRuleNoAttempts();

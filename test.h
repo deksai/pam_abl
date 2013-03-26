@@ -33,7 +33,7 @@ void runTypeTests();
 //test the database functions
 void runDatabaseTests();
 //test to test the purging and rule matching
-void runtRuleTests();
+void runRuleTests();
 //test to test how an attempt should be handled
 void testAbl();
 //test the running of external commands
