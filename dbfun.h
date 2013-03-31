@@ -36,7 +36,7 @@ typedef struct abl_db {
 } abl_db;
 
 
-
+typedef abl_db* (*abl_db_open_ptr)(const char *);
 /*
   Every module needs to have this function, which fills in the structure
   above.  

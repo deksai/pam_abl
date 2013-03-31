@@ -759,7 +759,7 @@ int main(int argc, char **argv) {
     /* Most everything should be set, and it should be safe to open the
      * databases. */
     void *dblib = NULL;
-    abl_db *(*db_open)();
+    abl_db_open_ptr db_open = NULL;
 
     dblib = dlopen(args->db_module, RTLD_LAZY);
     if (!dblib) {

@@ -44,7 +44,7 @@ static int setupTestEnvironment(abl_db **_abldb) {
     //args->db_module = db_module;
 
     void *dblib = NULL;
-    abl_db *(*db_open)();
+    abl_db_open_ptr db_open = NULL;
 
     dblib = dlopen(args->db_module, RTLD_LAZY);
     if (!dblib) {

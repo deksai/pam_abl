@@ -38,7 +38,7 @@ typedef struct abl_context {
 
 static int setup_db(abl_context *context) {
     void *dblib = NULL;
-    abl_db *(*db_open)();
+    abl_db_open_ptr db_open = NULL;
 
     dblib = dlopen(args->db_module, RTLD_LAZY|RTLD_GLOBAL);
     if (!dblib) {
