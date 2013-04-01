@@ -20,24 +20,41 @@ set(PAM_ABL_LIB_SRC
 )
 
 set(ABL_BDB_LIB_SRC
-    bdb.c
+	bdb.c
 )
 
 set(ABL_KCDB_LIB_SRC
-    kc.c
+	kc.c
 )
 
 set(PAM_ABL_TEST_SRC
-    test_abl.c
-    test.c
-    #test_db.c
-    test_rule.c
-    test_types.c
+	test_abl.c
+	test.c
+	test_db.c
+	test_rule.c
+	test_types.c
 	test_config.c
 )
 
-find_package(BerkeleyDB)
-find_package(KyotoCabinet)
+# Building without Berkeley Db or Kyoto Cabinet
+# If you want to build a version with one of the supported db's disabled
+# you can use one of the following commandline arguments when calling cmake
+# -DUSE_BDB=FALSE
+# -DUSE_KC=FALSE
+option (USE_BDB "Create a loadable module that uses Berkeley Db" ON)
+option (USE_KC "Create a loadable module that uses Kyoto Cabinet" ON)
+if(NOT USE_BDB AND NOT USE_KC)
+	message(FATAL_ERROR "At least Berkeley Db or Kyoto Cabinet should be enabled")
+endif(NOT USE_BDB AND NOT USE_KC)
+
+if(USE_BDB)
+	find_package(BerkeleyDB)
+endif(USE_BDB)
+
+if(USE_KC)
+	find_package(KyotoCabinet)
+endif(USE_KC)
+
 find_package(Pam REQUIRED)
 
 #we at least need BerkeleyDB or KyotoCabinet

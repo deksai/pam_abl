@@ -76,10 +76,10 @@ int main(int argc, const char *argv[]) {
     }
     config_create();
     args->db_module = argv[1];
-    printf("%s",args->db_module);
+    printf("%s\n",args->db_module);
     log_quiet_mode = 1;
     runTypeTests();
-    //runDatabaseTests();
+    runDatabaseTests();
     runRuleTests();
     testAbl();
     testExternalCommand(argv[0]);

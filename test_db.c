@@ -22,10 +22,13 @@
 #include "test.h"
 #include "dbfun.h"
 
+#include <dlfcn.h>
 #include <string.h>
+#include <stdio.h>
 
 #define TEST_DIR "/tmp/pam-abl_dbtest-dir"
 
+/*
 static DbEnvironment *openTestEnvironment() {
     DbEnvironment *environment = NULL;
     if (createEnvironment(NULL, TEST_DIR, &environment)) {
@@ -51,22 +54,45 @@ static Database *openTestDb(DbEnvironment *environment) {
     }
     return db;
 }
+*/
 
-static void testOpenClose() {
+static void testOpenClose(abl_db_open_ptr openFunc) {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
 
-    DbEnvironment *environment = openTestEnvironment();
-    if (!environment)
+    abl_db *db = openFunc(TEST_DIR);
+    if (!db) {
+        printf("   Unable to open the db environment\n");
         return;
+    }
+    if (!db->put)
+        printf("   put function is not defined.");
+    if (!db->del)
+        printf("   del function is not defined.");
+    if (!db->get)
+        printf("   get function is not defined.");
+    if (!db->c_open)
+        printf("   c_open function is not defined.");
+    if (!db->c_close)
+        printf("   c_close function is not defined.");
+    if (!db->c_get)
+        printf("   c_get function is not defined.");
+    if (!db->start_transaction)
+        printf("   start_transaction function is not defined.");
+    if (!db->commit_transaction)
+        printf("    commit_transaction function is not defined.");
+    if (!db->abort_transaction)
+        printf("   abort_transaction function is not defined.");
+    if (!db->close) {
+        printf("   close function is not defined.");
+    } else {
+        db->close(db);
+    }
 
-    Database *db = openTestDb(environment);
-    if (db)
-        closeDatabase(db);
-    destroyEnvironment(environment);
     removeDir(TEST_DIR);
 }
 
+/*
 static void testWriteReadOneTransaction() {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
@@ -295,11 +321,34 @@ static void testCreateRetrieveDelete() {
     destroyEnvironment(environment);
     removeDir(TEST_DIR);
 }
+*/
 
-void runDatabaseTests() {
-    printf("Db test start.\n");
+static abl_db_open_ptr load_db(const char *db_module) {
+    void *dblib = NULL;
+    abl_db_open_ptr db_open = NULL;
+
+    dblib = dlopen(db_module, RTLD_LAZY|RTLD_GLOBAL);
+    if (!dblib) {
+        printf("Failed to open db module \"%s\": %s\n", db_module, dlerror());
+        return db_open;
+    }
+    dlerror();
+    db_open = dlsym(dblib, "abl_db_open");
+    if  (!db_open) {
+        printf("Unable to get the abl_db_open symbol");
+    }
+    return db_open;
+}
+
+static void runTestsWithDb(const char *db, const char *dbName) {
+    printf("Db test start with %s.\n", dbName);
+    abl_db_open_ptr openFunc = load_db(db);
+    //if we are unable to load the open function, just skip the rest of the tests
+    if (!openFunc)
+        return;
     printf(" Starting testOpenClose.\n");
-    testOpenClose();
+    testOpenClose(openFunc);
+/*
     printf(" Starting testWriteReadOneTransaction.\n");
     testWriteReadOneTransaction();
     printf(" Starting testWriteReadDifferentTransactions.\n");
@@ -308,5 +357,15 @@ void runDatabaseTests() {
     testCreateRetrieveUpdate();
     printf(" Starting testCreateRetrieveDelete.\n");
     testCreateRetrieveDelete();
+*/
     printf("Db test end.\n");
+}
+
+void runDatabaseTests() {
+#ifdef BDB_PRESENT
+    runTestsWithDb("./pam_abl_bdb.so", "Berkeley db");
+#endif
+#ifdef KC_PRESENT
+    runTestsWithDb("./pam_abl_kc.so", "Kyoto Cabinet");
+#endif
 }
