@@ -4,7 +4,7 @@ if (NOT KyotoCabinet_INCLUDE_DIR)
 endif (NOT KyotoCabinet_INCLUDE_DIR)
 
 if (NOT KyotoCabinet_LIBRARY)
-  find_library(KyotoCabinet_LIBRARY NAMES kyotocabinet.lib libkyotocabinet.a kyotocabinet)
+  find_library(KyotoCabinet_LIBRARY NAMES kyotocabinet)
 endif (NOT KyotoCabinet_LIBRARY)
 
 if(KyotoCabinet_INCLUDE_DIR AND KyotoCabinet_LIBRARY)
