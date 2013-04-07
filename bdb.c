@@ -110,6 +110,9 @@ int bdb_commit_transaction(const abl_db *abldb) {
         return 0;
 
     int err = env->m_transaction->commit(env->m_transaction, 0);
+    if (err == DB_LOCK_DEADLOCK) {
+        env->m_transaction->abort(env->m_transaction);
+    }
     env->m_transaction = NULL;
     return err;
 }
@@ -308,7 +311,7 @@ int bdb_del(const abl_db *abldb, const char *hostOrUser, ablObjectType type) {
     memset(&key, 0, sizeof(key));
     key.data = (void*)hostOrUser;
     key.size = strlen(hostOrUser);
-    int err = db_handle->del(db_handle, NULL, &key, 0);
+    int err = db_handle->del(db_handle, db->m_transaction, &key, 0);
     return err;
 }
 
@@ -323,7 +326,7 @@ int bdb_c_open(abl_db *abldb, ablObjectType type) {
     else
         db_handle = db->m_uhandle;
     
-    if (err = db_handle->cursor(db_handle, NULL, &db->m_cursor, DB_TXN_SNAPSHOT), 0 != err) {
+    if (err = db_handle->cursor(db_handle, db->m_transaction, &db->m_cursor, DB_TXN_SNAPSHOT), 0 != err) {
         log_db_error(err, "creating cursor");
     }
     return err;

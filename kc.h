@@ -47,7 +47,7 @@ void kc_close(abl_db *);
 /*
   Get the authentication state for the given subject.
   \param abl_db The database to get the info from
-  \param char The object to look for, this ptr has te be valid and not an empty string
+  \param char The object to look for, this ptr has to be valid and not an empty string
   \param AuthState Returns the state of the object. If it is not found AuthState will be null
   \param ablObjectType Look for HOST or USER (HOST|USER perhaps in the future)
   \return zero on success, non zero otherwise

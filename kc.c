@@ -258,7 +258,8 @@ int kc_commit_transaction(const abl_db *abldb) {
     if (!success) return 1;
 
     state->transaction = 0;
-    return 1;
+    //everything succeeded, return success (0)
+    return 0;
 }
 
 int kc_abort_transaction(const abl_db *abldb) {
