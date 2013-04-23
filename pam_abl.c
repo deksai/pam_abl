@@ -262,7 +262,7 @@ static int update_status(const abl_db *db, const char *object,
     return err;
 }
 
-BlockState check_attempt(const abl_db *db, abl_info *info) {
+BlockState check_attempt(const abl_db *db, abl_info *info, ModuleAction subjects) {
     if (info)
         info->blockReason = AUTH_FAILED;
 
@@ -277,7 +277,7 @@ BlockState check_attempt(const abl_db *db, abl_info *info) {
 
     //fist check the host
     //do we need to update the host information?
-    if (host && args->host_rule) {
+    if ((subjects & ACTION_CHECK_HOST) && host && args->host_rule) {
         int hostStateChanged = 0;
         int err = update_status(db, host, HOST, service, args->host_rule, tm,
               &updatedHostState, &hostStateChanged);
@@ -291,7 +291,7 @@ BlockState check_attempt(const abl_db *db, abl_info *info) {
     }
 
     //now check the user
-    if (user && *user && args->user_rule) {
+    if ((subjects & ACTION_CHECK_USER) && user && *user && args->user_rule) {
         int userStateChanged = 0;
         int err = update_status(db, user, USER, service, args->user_rule, tm,
               &updatedUserState, &userStateChanged);
@@ -542,15 +542,15 @@ static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
     return err;
 }
 
-int record_attempt(const abl_db *db, abl_info *info) {
+int record_attempt(const abl_db *db, abl_info *info, ModuleAction subjects) {
     if (!db || !args || !info)
         return 1;
 
     int addHostResult = 0;
     int addUserResult = 0;
-    if (info->host && *info->host)
+    if (subjects & ACTION_LOG_HOST && info->host && *info->host)
         addHostResult = record_object(db, info,  HOST);
-    if (info->user && *info->user)
+    if (subjects & ACTION_LOG_USER && info->user && *info->user)
         addUserResult = record_object(db, info,  USER);
 
     return addHostResult || addUserResult;

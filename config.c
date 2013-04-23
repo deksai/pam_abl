@@ -62,6 +62,8 @@ static const char *is_arg(const char *name, const char *arg) {
 }
 
 static void config_clear() {
+    if (!args)
+        return;
     /* Init the args structure
      */
     args->db_home         = NULL;
@@ -78,7 +80,7 @@ static void config_clear() {
     args->user_clr_cmd    = NULL;
     args->upperlimit      = 0;
     args->lowerlimit      = 0;
-
+    args->debug           = 0;
     args->strs            = NULL;
 }
 
@@ -334,27 +336,51 @@ void dump_args() {
     }
 }
 
-/* Parse our argments and populate an abl_args structure accordingly.
- */
-int config_parse_args(int argc, const char **argv) {
-    int argn;
-    int err;
+int config_parse_module_args(int argc, const char **argv, ModuleAction *action) {
+    int err = 0;
+    int x = 0;
+    const char *v = NULL;
+    ModuleAction returnAction = ACTION_NONE;
 
-    config_clear(args);
+    //start by clearing the config
+    config_clear();
 
-    for (argn = 0; argn < argc; argn++) {
-        err = parse_arg(argv[argn]);
-        if (err) {
-            return err;
+    for (x = 0; x < argc; ++x) {
+        const char *arg = argv[x];
+        if (strcmp(arg, "debug") == 0) {
+            if (args)
+                args->debug = 1;
+        } else if (strcmp(arg, "check_user") == 0) {
+            returnAction |= ACTION_CHECK_USER;
+        } else if (strcmp(arg, "check_host") == 0) {
+            returnAction |= ACTION_CHECK_HOST;
+        } else if (strcmp(arg, "check_both") == 0) {
+            returnAction |= ACTION_CHECK_USER | ACTION_CHECK_HOST;
+        } else if (strcmp(arg, "log_user") == 0) {
+            returnAction |= ACTION_LOG_USER;
+        } else if (strcmp(arg, "log_host") == 0) {
+            returnAction |= ACTION_LOG_HOST;
+        } else if (strcmp(arg, "log_both") == 0) {
+            returnAction |= ACTION_LOG_USER | ACTION_LOG_HOST;
+        } else if ((v = is_arg("config", arg))) {
+            if ((err = config_parse_file(v)))
+                return err;
+        } else {
+            log_error("Illegal option: %s", arg);
+            return EINVAL;
         }
     }
 
-    return 0;
+    if (action)
+        *action = returnAction;
+    return err;
 }
 
 /* Destroy any storage allocated by args
  */
 void config_free() {
+    if (!args)
+        return;
     abl_string *s, *next;
 
     for (s = args->strs; s != NULL; s = next) {

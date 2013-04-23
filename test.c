@@ -74,14 +74,11 @@ int main(int argc, const char *argv[]) {
         printf("Please specify a database module to use.\n");
         return 1;
     }
-    config_create();
-    args->db_module = argv[1];
-    printf("%s\n",args->db_module);
     log_quiet_mode = 1;
     runTypeTests();
     runDatabaseTests();
     runRuleTests();
-    testAbl();
+    testAbl(argv[1]);
     testExternalCommand(argv[0]);
     testRunCommand();
     testConfig();

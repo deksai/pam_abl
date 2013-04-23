@@ -153,6 +153,107 @@ static void testNoCommand() {
     testSplit("", 0, NULL);
 }
 
+static void testGoodModuleArgsNoFile() {
+    int x, x1, x2, x3, x4, x5, x6, debugEnabled;
+    const char *argv[7];
+    for (x = 0; x <= 6; ++x)
+        argv[x] = NULL;
+    for (x1 = 0; x1 < 2; ++x1) {
+        for (x2 = 0; x2 < 2; ++x2) {
+            for (x3 = 0; x3 < 2; ++x3) {
+                for (x4 = 0; x4 < 2; ++x4) {
+                    for (x5 = 0; x5 < 2; ++x5) {
+                        for (x6 = 0; x6 < 2; ++x6) {
+                            for (debugEnabled = 0; debugEnabled < 2; ++debugEnabled) {
+                                //fillup the array
+                                x = 0;
+                                ModuleAction expectedResult = ACTION_NONE;
+                                if (x1) {
+                                    argv[x++] = "check_user";
+                                    expectedResult |= ACTION_CHECK_USER;
+                                }
+                                if (x2) {
+                                    argv[x++] = "check_host";
+                                    expectedResult |= ACTION_CHECK_HOST;
+                                }
+                                if (x3) {
+                                    argv[x++] = "check_both";
+                                    expectedResult |= ACTION_CHECK_USER | ACTION_CHECK_HOST;
+                                }
+                                if (x4) {
+                                    argv[x++] = "log_user";
+                                    expectedResult |= ACTION_LOG_USER;
+                                }
+                                if (x5) {
+                                    argv[x++] = "log_host";
+                                    expectedResult |= ACTION_LOG_HOST;
+                                }
+                                if (x6) {
+                                    argv[x++] = "log_both";
+                                    expectedResult |= ACTION_LOG_USER | ACTION_LOG_HOST;
+                                }
+                                if (debugEnabled) {
+                                    argv[x++] = "debug";
+                                }
+                                ModuleAction result;
+                                if (args)
+                                    config_free();
+                                config_create();
+                                if (config_parse_module_args(x, argv, &result)) {
+                                    printf("   the module arguments failed to parse\n");
+                                } else {
+                                    if (result != expectedResult) {
+                                        printf("   not all arguments were parsed correctly\n");
+                                    }
+                                    if (debugEnabled && !args->debug) {
+                                        printf("   debug was not enabled\n");
+                                    }
+                                    if (!debugEnabled && args->debug) {
+                                        printf("   debug was enabled\n");
+                                    }
+                                }
+                                config_free();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void testInvalidModuleArgsNoFile() {
+    config_free();
+    config_create();
+    const char *testSet[] = {
+        "debug",
+        "log_both",
+        "NON_EXISTING_OPTION",
+        "log_both"
+    };
+    ModuleAction result;
+    if (config_parse_module_args(4, (const char **)(&testSet), &result) == 0) {
+        printf("   the invalid module arguments parsed correctly\n");
+    }
+    config_free();
+}
+
+static void testValidModuleArgsInvalidFile() {
+    config_free();
+    config_create();
+    const char *testSet[] = {
+        "debug",
+        "log_both",
+        "config=/non-existing-dir/foobar_vnfitri5948sj",
+        "log_both"
+    };
+    ModuleAction result;
+    if (config_parse_module_args(4, (const char **)(&testSet), &result) == 0) {
+        printf("   the invalid module arguments parsed correctly\n");
+    }
+    config_free();
+}
+
 void testConfig() {
     printf("Config test start.\n");
     printf(" Starting testCommandNormal.\n");
@@ -173,5 +274,11 @@ void testConfig() {
     testEmptyBrackets();
     printf(" Starting testNoCommand.\n");
     testNoCommand();
+    printf(" Starting testGoodModuleArgsNoFile.\n");
+    testGoodModuleArgsNoFile();
+    printf(" Starting testInvalidModuleArgsNoFile.\n");
+    testInvalidModuleArgsNoFile();
+    printf(" Starting testValidModuleArgsInvalidFile.\n");
+    testValidModuleArgsInvalidFile();
     printf("Config test end.\n");
 }

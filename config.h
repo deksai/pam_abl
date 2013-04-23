@@ -49,7 +49,24 @@ abl_args *args;
 
 void config_create();
 void config_free();
-int config_parse_args(int argc, const char **argv);
+
+//when changing these values, make sure they can be combined
+typedef enum {
+    ACTION_NONE       = 0x0,
+    ACTION_CHECK_USER = 0x01,
+    ACTION_CHECK_HOST = 0x02,
+    ACTION_LOG_USER   = 0x04,
+    ACTION_LOG_HOST   = 0x08
+} ModuleAction;
+
+/*
+ * Parse the arguments of the pam module
+ * \param argc: The number of strings in the next argument
+ * \param argv: An array containing the arguments
+ * \param action: OUT will be filled
+ */
+int config_parse_module_args(int argc, const char **argv, ModuleAction *action);
+
 int config_parse_file(const char *name);
 void dump_args();
 /*

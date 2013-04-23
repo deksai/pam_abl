@@ -53,7 +53,7 @@ int runUserCommand(BlockState bState, abl_info *info);
     If something goes wrong while checking, CLEAR is returned
     and diagnostic messages are written to the log.
 */
-BlockState check_attempt(const abl_db *db, abl_info *info);
+BlockState check_attempt(const abl_db *db, abl_info *info, ModuleAction subjects);
 
 /*
     Record an authentication attempt.
@@ -62,7 +62,7 @@ BlockState check_attempt(const abl_db *db, abl_info *info);
         - add an entry for the given host and user with as reason info->blockReason
     If something went wrong, a non zero value is returned and a diagnostic message is logged
 */
-int record_attempt(const abl_db *db, abl_info *info);
+int record_attempt(const abl_db *db, abl_info *info, ModuleAction subjects);
 
 /*
   Following functions are only 'exported' for testing purposes

@@ -116,9 +116,9 @@ static int setupTestEnvironment(abl_db **_abldb) {
     return 0;
 }
 
-static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, BlockState newUserState,
+static void checkAttemptWithSubject(abl_db *abldb, const char *user, const char *userRule, BlockState newUserState,
                          const char *host, const char *hostRule, BlockState newHostState,
-                         const char *service, BlockState expectedBlockState, BlockReason bReason) {
+                         const char *service, BlockState expectedBlockState, BlockReason bReason, ModuleAction subjects) {
     args->host_rule = hostRule;
     args->user_rule = userRule;
 
@@ -127,7 +127,7 @@ static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, 
     info.user = user;
     info.host = host;
     info.service = service;
-    BlockState newState = check_attempt(abldb, &info);
+    BlockState newState = check_attempt(abldb, &info, subjects);
     if (newState != expectedBlockState) {
         printf("   Expected attempt to have as result %d, yet %d was returned.\n", (int)expectedBlockState, (int)newState);
     }
@@ -163,6 +163,13 @@ static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, 
         printf("   Does the host not exist in the db?.\n");
     }
     abldb->abort_transaction(abldb);
+}
+
+static void checkAttempt(abl_db *abldb, const char *user, const char *userRule, BlockState newUserState,
+                         const char *host, const char *hostRule, BlockState newHostState,
+                         const char *service, BlockState expectedBlockState, BlockReason bReason) {
+    checkAttemptWithSubject(abldb, user, userRule, newUserState, host, hostRule, newHostState, service,
+                            expectedBlockState, bReason, ACTION_CHECK_HOST | ACTION_CHECK_USER);
 }
 
 static void testCheckAttempt() {
@@ -216,10 +223,120 @@ static void testCheckAttempt() {
     checkAttempt(abldb, "bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, BOTH_BLOCKED);
 
     abldb->close(abldb);
-//    removeDir(TEST_DIR);
+    removeDir(TEST_DIR);
 }
 
-static void testRecordAttempt() {
+static void testCheckAttemptOnlyHost() {
+    removeDir(TEST_DIR);
+
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
+        printf("   Could not create our test environment.\n");
+        return;
+    }
+
+    //we have 20 user/hosts with a CLEAR/BLOCKED state, all with 50 attempts
+    const char *clearRule = "*:30/10s";
+    const char *blockRule = "*:1/1h";
+    const char *service = "Service";
+    ModuleAction subject = ACTION_CHECK_HOST;
+
+    //user clear, host clear, no blocking
+    checkAttemptWithSubject(abldb, "cu_0", clearRule, CLEAR, "ch_0", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host clear, no blocking
+    checkAttemptWithSubject(abldb, "cu_1", blockRule, CLEAR, "ch_1", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host clear, host blocked
+    checkAttemptWithSubject(abldb, "cu_2", clearRule, CLEAR, "ch_2", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+    //user clear, host clear, host blocked
+    checkAttemptWithSubject(abldb, "cu_3", blockRule, CLEAR, "ch_3", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+
+    //user blocked, host clear, no blocking
+    checkAttemptWithSubject(abldb, "bu_4", clearRule, BLOCKED, "ch_4", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host clear, no blocking
+    checkAttemptWithSubject(abldb, "bu_5", blockRule, BLOCKED, "ch_5", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host clear, host blocked
+    checkAttemptWithSubject(abldb, "bu_6", clearRule, BLOCKED, "ch_6", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+    //user blocked, host clear, host blocked
+    checkAttemptWithSubject(abldb, "bu_7", blockRule, BLOCKED, "ch_7", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+
+    //user clear, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "cu_8", clearRule, CLEAR, "bh_8", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "cu_9", blockRule, CLEAR, "bh_9", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host blocked, host blocked
+    checkAttemptWithSubject(abldb, "cu_10", clearRule, CLEAR, "bh_10", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+    //user clear, host blocked, host blocked
+    checkAttemptWithSubject(abldb, "cu_11", blockRule, CLEAR, "bh_11", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+
+    //user blocked, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "bu_12", clearRule, BLOCKED, "bh_12", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "bu_13", blockRule, BLOCKED, "bh_13", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host blocked, host blocked
+    checkAttemptWithSubject(abldb, "bu_14", clearRule, BLOCKED, "bh_14", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+    //user blocked, host blocked, host blocked
+    checkAttemptWithSubject(abldb, "bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, HOST_BLOCKED, subject);
+
+    abldb->close(abldb);
+    removeDir(TEST_DIR);
+}
+
+static void testCheckAttemptOnlyUser() {
+    removeDir(TEST_DIR);
+
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
+        printf("   Could not create our test environment.\n");
+        return;
+    }
+
+    //we have 20 user/hosts with a CLEAR/BLOCKED state, all with 50 attempts
+    const char *clearRule = "*:30/10s";
+    const char *blockRule = "*:1/1h";
+    const char *service = "Service";
+    ModuleAction subject = ACTION_CHECK_USER;
+
+    //user clear, host clear, no blocking
+    checkAttemptWithSubject(abldb, "cu_0", clearRule, CLEAR, "ch_0", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host clear, user blocked
+    checkAttemptWithSubject(abldb, "cu_1", blockRule, BLOCKED, "ch_1", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED, subject);
+    //user clear, host clear, no blocking
+    checkAttemptWithSubject(abldb, "cu_2", clearRule, CLEAR, "ch_2", blockRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host clear, user blocked
+    checkAttemptWithSubject(abldb, "cu_3", blockRule, BLOCKED, "ch_3", blockRule, CLEAR, service, BLOCKED, USER_BLOCKED, subject);
+
+    //user blocked, host clear, no blocking
+    checkAttemptWithSubject(abldb, "bu_4", clearRule, CLEAR, "ch_4", clearRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host clear, user blocked
+    checkAttemptWithSubject(abldb, "bu_5", blockRule, BLOCKED, "ch_5", clearRule, CLEAR, service, BLOCKED, USER_BLOCKED, subject);
+    //user blocked, host clear, no blocking
+    checkAttemptWithSubject(abldb, "bu_6", clearRule, CLEAR, "ch_6", blockRule, CLEAR, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host clear, user blocked
+    checkAttemptWithSubject(abldb, "bu_7", blockRule, BLOCKED, "ch_7", blockRule, CLEAR, service, BLOCKED, USER_BLOCKED, subject);
+
+    //user clear, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "cu_8", clearRule, CLEAR, "bh_8", clearRule, BLOCKED, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host blocked, user blocked
+    checkAttemptWithSubject(abldb, "cu_9", blockRule, BLOCKED, "bh_9", clearRule, BLOCKED, service, BLOCKED, USER_BLOCKED, subject);
+    //user clear, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "cu_10", clearRule, CLEAR, "bh_10", blockRule, BLOCKED, service, CLEAR, AUTH_FAILED, subject);
+    //user clear, host blocked, user blocked
+    checkAttemptWithSubject(abldb, "cu_11", blockRule, BLOCKED, "bh_11", blockRule, BLOCKED, service, BLOCKED, USER_BLOCKED, subject);
+
+    //user blocked, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "bu_12", clearRule, CLEAR, "bh_12", clearRule, BLOCKED, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host blocked, user blocked
+    checkAttemptWithSubject(abldb, "bu_13", blockRule, BLOCKED, "bh_13", clearRule, BLOCKED, service, BLOCKED, USER_BLOCKED, subject);
+    //user blocked, host blocked, no blocking
+    checkAttemptWithSubject(abldb, "bu_14", clearRule, CLEAR, "bh_14", blockRule, BLOCKED, service, CLEAR, AUTH_FAILED, subject);
+    //user blocked, host blocked, user blocked
+    checkAttemptWithSubject(abldb, "bu_15", blockRule, BLOCKED, "bh_15", blockRule, BLOCKED, service, BLOCKED, USER_BLOCKED, subject);
+
+    abldb->close(abldb);
+    removeDir(TEST_DIR);
+}
+
+static void testRecordAttemptWithAction(ModuleAction subject) {
     removeDir(TEST_DIR);
     char userBuffer[100];
     char hostBuffer[100];
@@ -249,7 +366,7 @@ static void testRecordAttempt() {
             snprintf(&userBuffer[0], 100, "user_%d", y);
             snprintf(&hostBuffer[0], 100, "host_%d", y);
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
-            if (record_attempt(abldb, &info))
+            if (record_attempt(abldb, &info, subject))
                 printf("   Could not add an attempt.\n");
         }
     }
@@ -270,36 +387,55 @@ static void testRecordAttempt() {
             printf("   Could not retrieve info for user %s.\n", &userBuffer[0]);
         if (abldb->get(abldb, &hostBuffer[0], &hostState, HOST))
             printf("   Could not retrieve info for host %s.\n", &hostBuffer[0]);
-        if (userState && hostState) {
-            if (getNofAttempts(userState) != 5 || getNofAttempts(hostState) != 5) {
-                printf("   We expected to find five attempts.\n");
+        if (subject & ACTION_LOG_USER) {
+            if (userState) {
+                if (getNofAttempts(userState) != 5) {
+                    printf("   We expected to find five attempts.\n");
+                } else {
+                    AuthAttempt attempt;
+                    while (nextAttempt(userState, &attempt) == 0) {
+                        if (strcmp(&hostBuffer[0], attempt.m_userOrHost) != 0)
+                            printf("   Expected host %s, but recieved %s.\n", &hostBuffer[0], attempt.m_userOrHost);
+                        if (strcmp(&serviceBuffer[0], attempt.m_service) != 0)
+                            printf("   Expected service %s, but recieved %s.\n", &serviceBuffer[0], attempt.m_service);
+                        if (attempt.m_time < currentTime)
+                            printf("   The attempt took place in the past.\n");
+                        if (attempt.m_reason != USER_BLOCKED)
+                            printf("   Exptected the reason to be %d, yet %d was returned.\n", (int)USER_BLOCKED, (int)attempt.m_reason);
+                    }
+                }
             } else {
-                AuthAttempt attempt;
-                while (nextAttempt(userState, &attempt) == 0) {
-                    if (strcmp(&hostBuffer[0], attempt.m_userOrHost) != 0)
-                        printf("   Expected host %s, but recieved %s.\n", &hostBuffer[0], attempt.m_userOrHost);
-                    if (strcmp(&serviceBuffer[0], attempt.m_service) != 0)
-                        printf("   Expected service %s, but recieved %s.\n", &serviceBuffer[0], attempt.m_service);
-                    if (attempt.m_time < currentTime)
-                        printf("   The attempt took place in the past.\n");
-                }
-
-                while (nextAttempt(hostState, &attempt) == 0) {
-                    if (strcmp(&userBuffer[0], attempt.m_userOrHost) != 0)
-                        printf("   Expected user %s, but recieved %s.\n", &userBuffer[0], attempt.m_userOrHost);
-                    if (strcmp(&serviceBuffer[0], attempt.m_service) != 0)
-                        printf("   Expected service %s, but recieved %s.\n", &serviceBuffer[0], attempt.m_service);
-                    if (attempt.m_time < currentTime)
-                        printf("   The attempt took place in the past.\n");
-                    if (attempt.m_reason != USER_BLOCKED)
-                        printf("   Exptected the reason to be %d, yet %d was returned.\n", (int)USER_BLOCKED, (int)attempt.m_reason);
-                }
+                printf("   Could not retrieve the user state.\n");
             }
         } else {
-            if (!userState)
-                printf("   Could not retrieve the user state.\n");
-            if (!hostState)
+            if (userState) {
+                printf("   We didn't expect to get user info as we didn't log user attempts\n");
+            }
+        }
+        if (subject & ACTION_LOG_HOST) {
+            if (hostState) {
+                if (getNofAttempts(hostState) != 5) {
+                    printf("   We expected to find five attempts.\n");
+                } else {
+                    AuthAttempt attempt;
+                    while (nextAttempt(hostState, &attempt) == 0) {
+                        if (strcmp(&userBuffer[0], attempt.m_userOrHost) != 0)
+                            printf("   Expected user %s, but recieved %s.\n", &userBuffer[0], attempt.m_userOrHost);
+                        if (strcmp(&serviceBuffer[0], attempt.m_service) != 0)
+                            printf("   Expected service %s, but recieved %s.\n", &serviceBuffer[0], attempt.m_service);
+                        if (attempt.m_time < currentTime)
+                            printf("   The attempt took place in the past.\n");
+                        if (attempt.m_reason != USER_BLOCKED)
+                            printf("   Exptected the reason to be %d, yet %d was returned.\n", (int)USER_BLOCKED, (int)attempt.m_reason);
+                    }
+                }
+            } else {
                 printf("   Could not retrieve the host state.\n");
+            }
+        } else {
+            if (hostState) {
+                printf("   We didn't expect to get host info as we didn't log host attempts\n");
+            }
         }
         if (userState)
             destroyAuthState(userState);
@@ -309,8 +445,20 @@ static void testRecordAttempt() {
 
     abldb->commit_transaction(abldb);
 
-//    removeDir(TEST_DIR);
+    removeDir(TEST_DIR);
     abldb->close(abldb);
+}
+
+static void testRecordAttempt() {
+    testRecordAttemptWithAction(ACTION_LOG_USER | ACTION_LOG_HOST);
+}
+
+static void testRecordAttemptOnlyHost() {
+    testRecordAttemptWithAction(ACTION_LOG_HOST);
+}
+
+static void testRecordAttemptOnlyUser() {
+    testRecordAttemptWithAction(ACTION_LOG_USER);
 }
 
 static void testRecordAttemptWhitelistHost() {
@@ -348,13 +496,13 @@ static void testRecordAttemptWhitelistHost() {
             snprintf(&userBuffer[0], 100, "user_%d", y);
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
             info.host = "127.0.0.1";
-            if (record_attempt(abldb, &info))
+            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
                 printf("   Could not add an attempt.\n");
 
             snprintf(&userBuffer[0], 100, "user__%d", y);
             snprintf(&serviceBuffer[0], 100, "service__%d", y);
             info.host = "";
-            if (record_attempt(abldb, &info))
+            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
                 printf("   Could not add an attempt.\n");
 
             //
@@ -365,11 +513,11 @@ static void testRecordAttemptWhitelistHost() {
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
 
             info.user = "username";
-            if (record_attempt(abldb, &info))
+            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
                 printf("   Could not add an attempt.\n");
 
             info.user = "";
-            if (record_attempt(abldb, &info))
+            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
                 printf("   Could not add an attempt.\n");
         }
     }
@@ -423,7 +571,7 @@ static void testRecordAttemptWhitelistHost() {
 
     abldb->commit_transaction(abldb);
     abldb->close(abldb);
-//    removeDir(TEST_DIR);
+    removeDir(TEST_DIR);
 }
 
 static void testRecordAttemptPurge() {
@@ -446,7 +594,7 @@ static void testRecordAttemptPurge() {
         return;
     }
 
-    if (record_attempt(abldb, &info))
+    if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
         printf("   Could not add an attempt.\n");
 
     //we know in the db every 10 seconds an attempt was made, lets's see if it is purged enough
@@ -759,12 +907,27 @@ static void testSubstituteWithPercent() {
     testSubstitute("%%command %%%u %%%h %%%s %%", "%user%", "%host%", "%service%", "%command %%user% %%host% %%service% %");
 }
 
-void testAbl() {
-    printf("Abl test start.\n");
+void testAbl(const char *dbModule) {
+    if (!dbModule || !*dbModule) {
+        printf("Failed to start Abl test (no database module).\n");
+    }
+    if (args)
+        config_free();
+    config_create();
+    args->db_module = dbModule;
+    printf("Abl test start with database %s.\n", dbModule);
     printf(" Starting testCheckAttempt.\n");
     testCheckAttempt();
+    printf(" Starting testCheckAttemptOnlyHost.\n");
+    testCheckAttemptOnlyHost();
+    printf(" Starting testCheckAttemptOnlyUser.\n");
+    testCheckAttemptOnlyUser();
     printf(" Starting testRecordAttempt.\n");
     testRecordAttempt();
+    printf(" Starting testRecordAttemptOnlyHost.\n");
+    testRecordAttemptOnlyHost();
+    printf(" Starting testRecordAttemptOnlyUser.\n");
+    testRecordAttemptOnlyUser();
     printf(" Starting testRecordAttemptWhitelistHost.\n");
     testRecordAttemptWhitelistHost();
     printf(" Starting testRecordAttemptPurge.\n");
@@ -790,6 +953,7 @@ void testAbl() {
     printf(" Starting testSubstituteWithPercent.\n");
     testSubstituteWithPercent();
     printf("Abl test end.\n");
+    config_free();
 }
 
 static void testCommand(const char *cmd, int exitCode) {
