@@ -413,10 +413,6 @@ static void testInvalidDbHome(abl_db_open_ptr openFunc) {
 }
 
 static void testConcurrency(abl_db_open_ptr openFunc, DbType dbType) {
-    if (dbType == DB_BDB) {
-        printf("   This test currently doesn't work with Berkeley DB.\n");
-        return;
-    }
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
     int pCount = 10;

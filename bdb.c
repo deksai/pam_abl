@@ -57,18 +57,18 @@ int create_environment(const char *home, DB_ENV **env) {
         }
 
 #if ((DB_VERSION_MAJOR >= 5)||(DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 7))
-        dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
+        err = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
 #else
-        dbenv->set_flags(dbenv, DB_LOG_AUTOREMOVE, 1);
+        err = dbenr->set_flags(dbenv, DB_LOG_AUTOREMOVE, 1);
 #endif
 
-        err = dbenv->log_set_config(dbenv, DB_LOG_AUTO_REMOVE, 1);
         if (err != 0) {
             log_db_error(err, "setting automatic log file removal.");
         }
         if ((err = dbenv->txn_checkpoint(dbenv, CHECKPOINTSIZE, 0, 0)) != 0) {
             log_db_error(err, "setting the automatic checkpoint option.");
         }
+
     }
 
     *env = dbenv;
@@ -158,10 +158,10 @@ abl_db* abl_db_open(const char *db_home) {
         goto open_fail;
 
     bdb_start_transaction((const abl_db*)db);
-    if ((err = host_handle->open(host_handle, state->m_transaction, "host", "db", DB_BTREE, DB_CREATE|DB_MULTIVERSION, DBPERM)) != 0) {
+    if ((err = host_handle->open(host_handle, state->m_transaction, "host", "db", DB_BTREE, DB_CREATE, DBPERM)) != 0) {
         goto open_fail;
     }
-    if ((err = user_handle->open(user_handle, state->m_transaction, "user", "db", DB_BTREE, DB_CREATE|DB_MULTIVERSION, DBPERM)) != 0) {
+    if ((err = user_handle->open(user_handle, state->m_transaction, "user", "db", DB_BTREE, DB_CREATE, DBPERM)) != 0) {
         goto open_fail;
     }
     bdb_commit_transaction((const abl_db*)db);
@@ -240,7 +240,7 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
 
     DB_TXN *tid = db->m_transaction;
 
-    err = db_handle->get(db_handle, tid, &key, &dbtdata, 0);
+    err = db_handle->get(db_handle, tid, &key, &dbtdata, DB_RMW);
     /*Called with DB_DBT_USERMEM?  What was there wasn't enough*/
     if (err == DB_BUFFER_SMALL) {
         allocData = malloc(dbtdata.size);
@@ -250,7 +250,7 @@ int bdb_get(const abl_db *abldb, const char *hostOrUser, AuthState **hostOrUserS
         dbtdata.ulen = dbtdata.size;
         dbtdata.size = 0;
         /* ...and try again. */
-        err = db_handle->get(db_handle, tid, &key, &dbtdata, 0);
+        err = db_handle->get(db_handle, tid, &key, &dbtdata, DB_RMW);
     }
 
     if (err != 0 && err != DB_NOTFOUND) {
