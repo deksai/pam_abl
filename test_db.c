@@ -412,7 +412,7 @@ static void testInvalidDbHome(abl_db_open_ptr openFunc) {
     }
 }
 
-static void testConcurrency(abl_db_open_ptr openFunc, DbType dbType) {
+static void testConcurrency(abl_db_open_ptr openFunc) {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
     int pCount = 10;
@@ -505,12 +505,14 @@ static void testConcurrency(abl_db_open_ptr openFunc, DbType dbType) {
     removeDir(TEST_DIR);
 }
 
-static void runTestsWithDb(const char *db, const char *dbName, DbType dbType) {
+static void runTestsWithDb(const char *db, const char *dbName) {
     printf(" Db test start with %s.\n", dbName);
     abl_db_open_ptr openFunc = load_db(db);
     //if we are unable to load the open function, just skip the rest of the tests
     if (!openFunc)
        return;
+    time_t begin;
+    time(&begin);
     printf("  Starting testOpenClose.\n");
     //abort the test as soon as we notice the open/close test failes
     if (testOpenClose(openFunc)) {
@@ -530,8 +532,12 @@ static void runTestsWithDb(const char *db, const char *dbName, DbType dbType) {
     printf("  Starting testInvalidDbHome.\n");
     testInvalidDbHome(openFunc);
     printf("  Starting testConcurrency.\n");
-    testConcurrency(openFunc, dbType);
+    testConcurrency(openFunc);
+    time_t end;
+    time(&end);
     printf(" Db test end.\n");
+    double elapsed = difftime(end,begin);
+    printf(" This Db test took us %f seconds.\n", elapsed);
 }
 
 void runDatabaseTests() {
@@ -540,7 +546,7 @@ void runDatabaseTests() {
     const char *bdbFile = "./pam_abl_bdb.so";
     struct stat bdbSts;
     if (stat(bdbFile, &bdbSts) == 0) {
-        runTestsWithDb(bdbFile, "Berkeley db", DB_BDB);
+        runTestsWithDb(bdbFile, "Berkeley db");
     } else {
         printf ("Could not find the pam-abl bdb module: %s\n", bdbFile);
     }
@@ -549,7 +555,7 @@ void runDatabaseTests() {
     const char *kcFile = "./pam_abl_kc.so";
     struct stat kcSts;
     if (stat(kcFile, &kcSts) == 0) {
-        runTestsWithDb(kcFile, "Kyoto Cabinet", DB_KC);
+        runTestsWithDb(kcFile, "Kyoto Cabinet");
     } else {
         printf ("Could not find the pam-abl kc module: %s\n", kcFile);
     }
