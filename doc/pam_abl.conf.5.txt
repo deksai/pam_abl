@@ -114,10 +114,8 @@ line to be continued. Here is a sample /etc/security/pam_abl.conf:
 ----------------------------
 # /etc/security/pam_abl.conf  
 debug                         
-host_db=/var/lib/abl/hosts.db 
 host_purge=2d                 
 host_rule=*:10/1h,30/1d       
-user_db=/var/lib/abl/users.db 
 user_purge=2d                 
 user_rule=!root:10/1h,30/1d   
 ---------------------------
@@ -129,9 +127,13 @@ with the exception of debug and no_warn these are ignored.
 The arguments that are specific to the PAM module are as follows:
 
 *db_home*::
-Specify the directory where the Berkeley db
-can store it's lock and log files. Make sure
-this dir exists and is writable.
+Specify the directory where the selected database module can store 
+it's lock and log files. Make sure this dir exists and is writable.
+
+*db_module*::
+Specifies what db backed to use, this needs to be the path to the 
+library build together with pam_abl. For them moment we support 2 
+db backends. Berkeley Db and Kyoto Cabinet.
 
 *limits*::
 It's value should have the following syntax "<minimum>-<maximum>".
@@ -141,16 +143,6 @@ As soon as there are a <maximum> number of attempts for a user/host,
 the number of stored attempts for this user/host is reduced to <minimum>. 
 A <maximum> of 0 means no limits. Make sure that <minimum> is larger 
 then any rule specified. We recommend a value of "1000-1200".
-
-*host_db, user_db*::
-Specify the name of the databases that will   
-be used to log failed authentication          
-attempts. The host database is used to log    
-the hostname responsible for a failed auth    
-and the user database is used to log the      
-requested username. If host_db or user_db is  
-omitted the corresponding auto blacklisting   
-will be disabled.                             
 
 *host_purge, user_purge*::
 Specify the length of time for which failed   
@@ -221,11 +213,11 @@ EXAMPLE
 ----------------------------
 # /etc/security/pam_abl.conf  
 debug                         
-host_db=/var/lib/abl/hosts.db 
+db_home=/var/run/pam_abl_dbs
+db_module=/lib/security/pam_abl_kc.so
 host_purge=2d                 
 host_rule=*:10/1h,30/1d       
 host_block_cmd=[/sbin/iptables] [-I] [INPUT] [-s] [%h] [-j] [DROP]
-user_db=/var/lib/abl/users.db 
 user_purge=2d                 
 user_rule=!root:10/1h,30/1d   
 user_clear_cmd=[/usr/bin/logger] [block] [user] [%u]

@@ -17,9 +17,6 @@ failed authentication attempts. Generally configured so that blacklisted
 users still see normal login prompts but are guaranteed to fail to
 authenticate.
 
-This functionality is only available to services which call PAM as root.
-If pam_abl is called for uid != 0 it will silently succeed.
-
 DESCRIPTION
 -----------
 
@@ -42,12 +39,6 @@ Commands can be specified which will be run when a host or user switches state
 from being blocked to clear or clear to blocked.  See below or the
 pam_abl.conf(5) manpage for the details.
 
-If pam_abl is called for uid != 0 it will silently succeed.  If this was not the
-case it would be possible for a malicious local user to poison the pam_abl data
-by, for example, discovering the names of the hosts from which root typically
-logs in and then constructing PAM authentication code to lock out root login
-attempts from those hosts.
-
 OPTIONS
 -------
 
@@ -55,130 +46,51 @@ OPTIONS
 |=========================================================================
 |'Name'|'Arguments'|'Description'           
 |debug|None|Enable debug output to syslog. 
-|expose_account|None|Ignored 
-
-|no_warn|None|
-Disable warnings which are otherwise output to syslog.  try_first_pass None
-Ignored 
-
-|use_first_pass|None|Ignored 
-|use_mapped_pass|None|Ignored 
 
 |config|Path to the configuration file.|
-The configuration file contains additional arguments. In order for the pam_abl command line tool to work correctly most of the configuration should be placed in the config file rather than being provided by arguments. The format of the config file is described below.
+The configuration file contains all non call specific arguments (options not specific to a specific usage). Please see the pam_abl.conf manpage for more information regarding this file. 
 
-|limits|Minimum and maximum number of attempts to keep.|
-It's value should have the following syntax "<minimum>-<maximum>".
-If you do not block machines that do too many attempts, the db can easily become bloated.
-To prevent this we introduced this setting. As soon as there are a <maximum> number of attempts
-for a user/host, the number of stored attempts is reduced to <minimum>. A <maximum> of 0 means no limits.
-Make sure that <minimum> is larger then any rule specified. We recommend a value of "1000-1200".
+|check_user, check_host, check_both|Check if the given the user/host is blocked|
+Check if the current user (when using check_user or check_both) or the current host (when using check_host or check_both) is blocked. PAM_AUTH_ERR will be returned if the user/host is blocked. check_both is the same as specifying both check_user and check_host. You can use this option to decide if only the user or host needs to be checked.
 
-|db_home|Directory for db locking and logging files.|
-Path to a directory where Berkeley DB can place it's locking and logging files.
-Make sure this dir is writable.
-
-|host_db|Path to host database file.|
-Path to the Berkeley DB which is used to log the host responsible for failed
-authentication attempts.
-
-|host_purge|Purge time for the host database.|
-Defines how long failed hosts are retained in the host database. Defaults to 1
-day.
-
-|host_rule|Rule for host blacklisting.|
-The rule (see below for format) which defines the conditions under which a
-failed hosts will be blackisted.
-
-|host_whitelist|Host that do not need to be tracked.|
-;-seperated list of host that do not need to be tracked. 
-You can specify single IP addresses here or use subnets.
-For example 1.1.1.1 or 1.1.1.1/24
-
-|host_blk_cmd|Host block command |
-Deprecated for security reasons. Please use host_block_cmd
-
-|host_clr_cmd|Host clear command |
-Deprecated for security reasons. Please use host_clear_cmd
-
-|host_block_cmd|Host block command |
-Command that should be run when a host is checked, and is currently blocked.
-Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used. Please see the manpage of
-pam_abl.conf for the correct syntax.
-
-|host_clear_cmd|Host clear command |
-Command that should be run when a host is checked, and is currently clear.
-Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used. Please see the manpage of
-pam_abl.conf for the correct syntax.
-
-|user_db|Path to user database file.|
-Path to the Berkeley DB which is used to log the user responsible for failed
-authentication attempts.
-
-|user_purge|Purge time for the user database.|
-Defines how long failed users are retained in the user database. Defaults to 1
-day.
-
-|user_rule|Rule for user blacklisting.|
-The rule (see below for format) which defines the conditions under which a
-failed users will be blackisted.
-
-|user_whitelist|Users that do not need to be tracked.|
-;-seperated list of users whose attempts do not need to be recorded.
-This does not prevent the machine they are using from being blocked.
-
-|user_blk_cmd|User block command |
-Deprecated for security reasons. Please use user_block_cmd
-
-|user_clr_cmd|User clear command |
-Deprecated for security reasons. Please use clear_block_cmd
-
-|user_blk_cmd|User block command |
-Command that should be run when a user is checked, and is currently blocked.
-Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used.
-
-|user_clr_cmd|User block command |
-Command that should be run when a user is checked, and is currently clear.
-Within the command, the strings %u, %h and %s are substituted with username,
-host and service.  Not all need to be used.
+|log_user, log_host, log_both|Add a failed attempt to the list for that user/host|
+Add an authentication failure to the current user (if log_user or log_both is used) or host (if log_host or log_both is used). If only log_user/log_host is given, the reason will only be based on the user/host database. To give an example: the current host is blocked, the user isn't and only log_user given. The logged reason will only take into account that the current user is not blocked, resulting in AUTH_FAILED. If in this case log_both was given, the resulting reason would have been HOST_BLOCKED.
 
 |=========================================================================
 
 USAGE
 -----
 
-Typically pam_abl.so is added to the auth stack as a required
-module just before whatever modules actually peform
-authentication. Here's a fragment of the PAM config for a
-production server that is running pam_abl:
-
-auth required   /lib/security/pam_env.so                           
-auth required   /lib/security/pam_abl.so                           
-                config=/etc/security/pam_abl.conf                  
-auth sufficient /lib/security/pam_unix.so likeauth nullok          
-auth required   /lib/security/pam_deny.so                          
-
-Although all of accepted arguments can be supplied here they will
-usually be placed in a separate config file and linked to using
-the config argument as in the above example. The pam_abl command
-line tool reads the external config file
-(/etc/security/pam_abl.conf in this case) to find the databases so
-in order for it work correctly an external config should be used.
-
+Typically pam_abl.so with as action check_both is added to the top of the PAM service file. 
+And pam_abl.so with as actiuon log_both is normally added just before a pam_deny.so
+See the examples section for a working example.
 
 EXAMPLES
 --------
 
+A real simple service file could look like this:
 -------------------------------------
-auth required /lib/security/pam_env.so 
-auth required /lib/security/pam_abl.so config=/etc/security/pam_abl.conf 
-auth sufficient /lib/security/pam_unix.so likeauth nullok 
-auth required /lib/security/pam_deny.so 
--------------------------------------
+auth required pam_env.so
 
+auth [default=ignore] pam_exec.so quiet /usr/bin/logger starting pam-abl check 
+auth [success=ok default=4] pam_abl.so check_both config=/etc/security/pam_abl.conf debug
+# Password
+auth [default=ignore] pam_exec.so quiet /usr/bin/logger starting password check
+auth [success=ok ignore=ignore default=2] pam_unix.so try_first_pass
+auth [default=ignore] pam_exec.so quiet /usr/bin/logger auth success
+auth [default=3] pam_permit.so
+# default deny action
+auth [default=ignore] pam_exec.so quiet /usr/bin/logger default deny action
+auth required pam_abl.so log_both config=/etc/security/pam_abl.conf debug
+auth required pam_deny.so
+
+account required pam_unix.so
+session required pam_unix.so
+password required pam_unix.so
+-------------------------------------
+The pam_exec.so sections are just there for debugging reasons. 
+First the config checks if the current user or host is already blocked, if so it automatically jumps to the "default deny action" section.
+If the user or host was not blocked already, we evaluate the "Password" section and use pam_unix.so to actually check the given password. If the password is correct we evalute "pam_permit.so", given an incorrect password we jump to the "default deny action" section.
 
 SEE ALSO
 --------
