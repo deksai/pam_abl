@@ -20,6 +20,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+#include "CUnit/Basic.h"
+
 //some helper functions
 void removeDir(const char *dirname);
 void makeDir(const char *dirname);
@@ -29,18 +31,20 @@ void makeDir(const char *dirname);
 //run all the tests
 void runTests();
 //tests that have to do with the custom types.
-void runTypeTests();
+void addTypeTests();
+//Type performance tests
+void runPerformanceTest();
 //test the database functions
-void runDatabaseTests();
+void addDatabaseTests();
 //test to test the purging and rule matching
-void runRuleTests();
+void addRuleTests();
 //test to test how an attempt should be handled
-void testAbl();
+void addAblTests(const char *module);
 //test the running of external commands
-void testExternalCommand(const char *cmd);
+void addExternalCommandTests(const char *cmd);
 //test the integrated parsing of external commands
-void testRunCommand();
+void addRunCommandTests();
 //test the config parsing
-void testConfig();
+void addConfigTests();
 
 #endif

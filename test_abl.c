@@ -28,6 +28,9 @@
 
 #define TEST_DIR "/tmp/pam-abl_test-dir"
 
+static const char *exePath = NULL;
+static const char *dbModule = NULL;
+
 static int setupTestEnvironment(abl_db **_abldb) {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
@@ -48,19 +51,19 @@ static int setupTestEnvironment(abl_db **_abldb) {
 
     dblib = dlopen(args->db_module, RTLD_LAZY);
     if (!dblib) {
-        printf("%s opening database module",dlerror());
+        CU_FAIL("Failed to load the database module.");
         return 1;
     }
     dlerror();
     db_open = dlsym(dblib, "abl_db_open");
     if (!db_open) {
-        printf("Could not load the \"abl_db_open\" function\n");
+        CU_FAIL("Could not load the \"abl_db_open\" function.");
         return 1;
     }
     *_abldb = db_open(args->db_home);
     abl_db *abldb = *_abldb;
     if (!abldb) {
-        printf("Could not open database\n");
+        CU_FAIL("Could not open the database.");
         return 1;
     }
 
@@ -69,13 +72,13 @@ static int setupTestEnvironment(abl_db **_abldb) {
         AuthState *userClearState = NULL;
         AuthState *userBlockedState = NULL;
         if (createEmptyState(CLEAR, &userClearState) || createEmptyState(BLOCKED, &userBlockedState)) {
-            printf("   Could not create an empty state.\n");
+            CU_FAIL("Could not create an empty state.");
             return 1;
         }
         AuthState *hostClearState = NULL;
         AuthState *hostBlockedState = NULL;
         if (createEmptyState(CLEAR, &hostClearState) || createEmptyState(BLOCKED, &hostBlockedState)) {
-            printf("   Could not create an empty state.\n");
+            CU_FAIL("Could not create an empty state.");
             return 1;
         }
         snprintf(userClearBuffer, 100, "cu_%d", i);
@@ -86,23 +89,15 @@ static int setupTestEnvironment(abl_db **_abldb) {
         int x = 50;
         for (; x >= 0; --x) {
             time_t logTime = tm - x*10;
-            if (addAttempt(userClearState, USER_BLOCKED, logTime, "host", "Service", 0, 0))
-                printf("   Could not add an attempt for user %s.\n", userClearBuffer);
-            if (addAttempt(userBlockedState, USER_BLOCKED, logTime, "host", "Service", 0, 0))
-                printf("   Could not add an attempt for user %s.\n", userBlockedBuffer);
-            if (addAttempt(hostClearState, USER_BLOCKED, logTime, "user", "Service", 0, 0))
-                printf("   Could not add an attempt for host %s.\n", hostClearBuffer);
-            if (addAttempt(hostBlockedState, USER_BLOCKED, logTime, "user", "Service", 0, 0))
-                printf("   Could not add an attempt for host %s.\n", hostBlockedBuffer);
+            CU_ASSERT_FALSE(addAttempt(userClearState, USER_BLOCKED, logTime, "host", "Service", 0, 0));
+            CU_ASSERT_FALSE(addAttempt(userBlockedState, USER_BLOCKED, logTime, "host", "Service", 0, 0));
+            CU_ASSERT_FALSE(addAttempt(hostClearState, USER_BLOCKED, logTime, "user", "Service", 0, 0));
+            CU_ASSERT_FALSE(addAttempt(hostBlockedState, USER_BLOCKED, logTime, "user", "Service", 0, 0));
         }
-        if (abldb->put(abldb, userClearBuffer, userClearState, USER))
-            printf("   Could not save state for user %s.\n", userClearBuffer);
-        if (abldb->put(abldb, userBlockedBuffer, userBlockedState, USER))
-            printf("   Could not save state for user %s.\n", userBlockedBuffer);
-        if (abldb->put(abldb, hostClearBuffer, hostClearState, HOST))
-            printf("   Could not save state for host %s.\n", hostClearBuffer);
-        if (abldb->put(abldb, hostBlockedBuffer, hostBlockedState, HOST))
-            printf("   Could not save state for host %s.\n", hostBlockedBuffer);
+        CU_ASSERT_FALSE(abldb->put(abldb, userClearBuffer, userClearState, USER));
+        CU_ASSERT_FALSE(abldb->put(abldb, userBlockedBuffer, userBlockedState, USER));
+        CU_ASSERT_FALSE(abldb->put(abldb, hostClearBuffer, hostClearState, HOST));
+        CU_ASSERT_FALSE(abldb->put(abldb, hostBlockedBuffer, hostBlockedState, HOST));
         destroyAuthState(userClearState);
         destroyAuthState(userBlockedState);
         destroyAuthState(hostClearState);
@@ -112,7 +107,6 @@ static int setupTestEnvironment(abl_db **_abldb) {
     free(hostClearBuffer);
     free(userBlockedBuffer);
     free(hostBlockedBuffer);
-    //config_free();
     return 0;
 }
 
@@ -128,39 +122,31 @@ static void checkAttemptWithSubject(abl_db *abldb, const char *user, const char 
     info.host = host;
     info.service = service;
     BlockState newState = check_attempt(abldb, &info, subjects);
-    if (newState != expectedBlockState) {
-        printf("   Expected attempt to have as result %d, yet %d was returned.\n", (int)expectedBlockState, (int)newState);
-    }
-    if (info.blockReason != bReason) {
-        printf("   Expected the reason to be %d, yet %d was returned.\n", (int)bReason, (int)info.blockReason);
-    }
+    CU_ASSERT_EQUAL(newState, expectedBlockState);
+    CU_ASSERT_EQUAL(info.blockReason, bReason);
     AuthState *userState = NULL;
     int err = abldb->start_transaction(abldb);
     if (err) {
-        log_error("starting transaction to %s.", __func__);
+        CU_FAIL("starting transaction failed");
         return;
     }
-    if (abldb->get(abldb, user, &userState, USER))
-        printf("   Could not retrieve the current state of the user.\n");
+    CU_ASSERT_FALSE(abldb->get(abldb, user, &userState, USER));
     if (userState) {
         BlockState retrievedState = getState(userState);
-        if (retrievedState != newUserState)
-            printf("   Expected attempt to have as user blockstate %d, yet %d was returned.\n", (int)newUserState, (int)retrievedState);
+        CU_ASSERT_EQUAL(retrievedState, newUserState);
         destroyAuthState(userState);
     } else {
-        printf("   Does the host not exist in the db?.\n");
+        CU_FAIL("Unable to retrieve the subject from the database.");
     }
 
     AuthState *hostState = NULL;
-    if (abldb->get(abldb, host, &hostState, HOST))
-        printf("   Could not retrieve the current state of the host.\n");
+    CU_ASSERT_FALSE(abldb->get(abldb, host, &hostState, HOST));
     if (hostState) {
         BlockState retrievedState = getState(hostState);
-        if (retrievedState != newHostState)
-            printf("   Expected attempt to have as host blockstate %d, yet %d was returned.\n", (int)newHostState, (int)retrievedState);
+        CU_ASSERT_EQUAL(retrievedState, newHostState);
         destroyAuthState(hostState);
     } else {
-        printf("   Does the host not exist in the db?.\n");
+        CU_FAIL("Unable to retrieve the host from the database.");
     }
     abldb->abort_transaction(abldb);
 }
@@ -177,7 +163,7 @@ static void testCheckAttempt() {
 
     abl_db *abldb = NULL;
     if (setupTestEnvironment(&abldb) || !abldb) {
-        printf("   Could not create our test environment.\n");
+        CU_FAIL("Could not create our test environment.");
         return;
     }
 
@@ -231,7 +217,7 @@ static void testCheckAttemptOnlyHost() {
 
     abl_db *abldb = NULL;
     if (setupTestEnvironment(&abldb) || !abldb) {
-        printf("   Could not create our test environment.\n");
+        CU_FAIL("Could not create our test environment.");
         return;
     }
 
@@ -286,7 +272,7 @@ static void testCheckAttemptOnlyUser() {
 
     abl_db *abldb = NULL;
     if (setupTestEnvironment(&abldb) || !abldb) {
-        printf("   Could not create our test environment.\n");
+        CU_FAIL("Could not create our test environment.");
         return;
     }
 
@@ -355,7 +341,7 @@ static void testRecordAttemptWithAction(ModuleAction subject) {
 
     abl_db *abldb = NULL;
     if (setupTestEnvironment(&abldb) || !abldb) {
-        printf("   Could not create our test environment.\n");
+        CU_FAIL("Could not create our test environment.");
         return;
     }
 
@@ -366,14 +352,13 @@ static void testRecordAttemptWithAction(ModuleAction subject) {
             snprintf(&userBuffer[0], 100, "user_%d", y);
             snprintf(&hostBuffer[0], 100, "host_%d", y);
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
-            if (record_attempt(abldb, &info, subject))
-                printf("   Could not add an attempt.\n");
+            CU_ASSERT_FALSE(record_attempt(abldb, &info, subject));
         }
     }
 
     int err = abldb->start_transaction(abldb);
     if (err) {
-        log_error("starting transaction to %s.", __func__);
+        CU_FAIL("Starting transaction failed.");
         return;
     }
 
@@ -383,59 +368,45 @@ static void testRecordAttemptWithAction(ModuleAction subject) {
         snprintf(&serviceBuffer[0], 100, "service_%d", y);
         AuthState *userState = NULL;
         AuthState *hostState = NULL;
-        if (abldb->get(abldb, &userBuffer[0], &userState, USER))
-            printf("   Could not retrieve info for user %s.\n", &userBuffer[0]);
-        if (abldb->get(abldb, &hostBuffer[0], &hostState, HOST))
-            printf("   Could not retrieve info for host %s.\n", &hostBuffer[0]);
+        CU_ASSERT_FALSE(abldb->get(abldb, &userBuffer[0], &userState, USER));
+        CU_ASSERT_FALSE(abldb->get(abldb, &hostBuffer[0], &hostState, HOST));
         if (subject & ACTION_LOG_USER) {
             if (userState) {
                 if (getNofAttempts(userState) != 5) {
-                    printf("   We expected to find five attempts.\n");
+                    CU_FAIL("We expected to find five attempts.");
                 } else {
                     AuthAttempt attempt;
                     while (nextAttempt(userState, &attempt) == 0) {
-                        if (strcmp(&hostBuffer[0], attempt.m_userOrHost) != 0)
-                            printf("   Expected host %s, but recieved %s.\n", &hostBuffer[0], attempt.m_userOrHost);
-                        if (strcmp(&serviceBuffer[0], attempt.m_service) != 0)
-                            printf("   Expected service %s, but recieved %s.\n", &serviceBuffer[0], attempt.m_service);
-                        if (attempt.m_time < currentTime)
-                            printf("   The attempt took place in the past.\n");
-                        if (attempt.m_reason != USER_BLOCKED)
-                            printf("   Exptected the reason to be %d, yet %d was returned.\n", (int)USER_BLOCKED, (int)attempt.m_reason);
+                        CU_ASSERT_STRING_EQUAL(&hostBuffer[0], attempt.m_userOrHost);
+                        CU_ASSERT_STRING_EQUAL(&serviceBuffer[0], attempt.m_service);
+                        CU_ASSERT_FALSE(attempt.m_time < currentTime);
+                        CU_ASSERT_EQUAL(attempt.m_reason, USER_BLOCKED);
                     }
                 }
             } else {
-                printf("   Could not retrieve the user state.\n");
+                CU_FAIL("Could not retrieve the user state.");
             }
         } else {
-            if (userState) {
-                printf("   We didn't expect to get user info as we didn't log user attempts\n");
-            }
+            CU_ASSERT_PTR_NULL(userState);
         }
         if (subject & ACTION_LOG_HOST) {
             if (hostState) {
                 if (getNofAttempts(hostState) != 5) {
-                    printf("   We expected to find five attempts.\n");
+                    CU_FAIL("We expected to find five attempts.");
                 } else {
                     AuthAttempt attempt;
                     while (nextAttempt(hostState, &attempt) == 0) {
-                        if (strcmp(&userBuffer[0], attempt.m_userOrHost) != 0)
-                            printf("   Expected user %s, but recieved %s.\n", &userBuffer[0], attempt.m_userOrHost);
-                        if (strcmp(&serviceBuffer[0], attempt.m_service) != 0)
-                            printf("   Expected service %s, but recieved %s.\n", &serviceBuffer[0], attempt.m_service);
-                        if (attempt.m_time < currentTime)
-                            printf("   The attempt took place in the past.\n");
-                        if (attempt.m_reason != USER_BLOCKED)
-                            printf("   Exptected the reason to be %d, yet %d was returned.\n", (int)USER_BLOCKED, (int)attempt.m_reason);
+                        CU_ASSERT_STRING_EQUAL(&userBuffer[0], attempt.m_userOrHost);
+                        CU_ASSERT_STRING_EQUAL(&serviceBuffer[0], attempt.m_service);
+                        CU_ASSERT_FALSE(attempt.m_time < currentTime);
+                        CU_ASSERT_EQUAL(attempt.m_reason, USER_BLOCKED);
                     }
                 }
             } else {
-                printf("   Could not retrieve the host state.\n");
+                CU_FAIL("Could not retrieve the host state.");
             }
         } else {
-            if (hostState) {
-                printf("   We didn't expect to get host info as we didn't log host attempts\n");
-            }
+            CU_ASSERT_PTR_NULL(hostState);
         }
         if (userState)
             destroyAuthState(userState);
@@ -477,7 +448,7 @@ static void testRecordAttemptWhitelistHost() {
 
     abl_db *abldb = NULL;
     if (setupTestEnvironment(&abldb) || !abldb) {
-        printf("   Could not create our test environment.\n");
+        CU_FAIL("Could not create our test environment.");
         return;
     }
 
@@ -496,14 +467,12 @@ static void testRecordAttemptWhitelistHost() {
             snprintf(&userBuffer[0], 100, "user_%d", y);
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
             info.host = "127.0.0.1";
-            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
-                printf("   Could not add an attempt.\n");
+            CU_ASSERT_FALSE(record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER));
 
             snprintf(&userBuffer[0], 100, "user__%d", y);
             snprintf(&serviceBuffer[0], 100, "service__%d", y);
             info.host = "";
-            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
-                printf("   Could not add an attempt.\n");
+            CU_ASSERT_FALSE(record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER));
 
             //
             // Add some user checking attempts
@@ -513,12 +482,10 @@ static void testRecordAttemptWhitelistHost() {
             snprintf(&serviceBuffer[0], 100, "service_%d", y);
 
             info.user = "username";
-            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
-                printf("   Could not add an attempt.\n");
+            CU_ASSERT_FALSE(record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER));
 
             info.user = "";
-            if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
-                printf("   Could not add an attempt.\n");
+            CU_ASSERT_FALSE(record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER));
         }
     }
 
@@ -532,42 +499,31 @@ static void testRecordAttemptWhitelistHost() {
         snprintf(&userBuffer[0], 100, "user_%d", y);
         snprintf(&serviceBuffer[0], 100, "service_%d", y);
         AuthState *userState = NULL;
-        if (abldb->get(abldb, &userBuffer[0], &userState, USER))
-            printf("   Could not retrieve info for user %s.\n", &userBuffer[0]);
+        CU_ASSERT_FALSE(abldb->get(abldb, &userBuffer[0], &userState, USER));
         if (userState) {
-            if (getNofAttempts(userState) != 5) {
-                printf("   We expected to find five attempts %d.\n", (int)(getNofAttempts(userState)));
-            }
+            CU_ASSERT_EQUAL(getNofAttempts(userState), 5);
             destroyAuthState(userState);
         } else {
-            printf("   Could not retrieve the user state.\n");
+            CU_FAIL("Could not retrieve the user state.");
         }
     }
 
     AuthState *hostState = NULL;
-    if (abldb->get(abldb, "127.0.0.1", &hostState, HOST))
-        printf("   Could not retrieve info for host 127.0.0.1.\n");
-    if (hostState)
-        printf("   We expected an empty state for host 127.0.0.1\n");
+    CU_ASSERT_FALSE(abldb->get(abldb, "127.0.0.1", &hostState, HOST));
+    CU_ASSERT_PTR_NULL(hostState);
 
     hostState = NULL;
-    if (abldb->get(abldb, "", &hostState, HOST))
-        printf("   Could not retrieve info for the empty host.\n");
-    if (hostState)
-        printf("   We expected an empty state for the empty host\n");
+    CU_ASSERT_FALSE(abldb->get(abldb, "", &hostState, HOST));
+    CU_ASSERT_PTR_NULL(hostState);
 
 
     AuthState *userState = NULL;
-    if (abldb->get(abldb, "", &userState, USER))
-        printf("   Could not retrieve info for the empty user.\n");
-    if (userState)
-        printf("   We expected an empty state for the empty user\n");
+    CU_ASSERT_FALSE(abldb->get(abldb, "", &userState, USER));
+    CU_ASSERT_PTR_NULL(userState);
 
     userState = NULL;
-    if (abldb->get(abldb, "username", &userState, USER))
-        printf("   Could not retrieve info for the empty user.\n");
-    if (userState)
-        printf("   We expected an empty state for the empty user\n");
+    CU_ASSERT_FALSE(abldb->get(abldb, "username", &userState, USER));
+    CU_ASSERT_PTR_NULL(userState);
 
     abldb->commit_transaction(abldb);
     abldb->close(abldb);
@@ -590,12 +546,11 @@ static void testRecordAttemptPurge() {
 
     abl_db *abldb = NULL;
     if (setupTestEnvironment(&abldb) || !abldb) {
-        printf("   Could not create our test environment.\n");
+        CU_FAIL("Could not create our test environment.");
         return;
     }
 
-    if (record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER))
-        printf("   Could not add an attempt.\n");
+    CU_ASSERT_FALSE(record_attempt(abldb, &info, ACTION_LOG_HOST | ACTION_LOG_USER));
 
     //we know in the db every 10 seconds an attempt was made, lets's see if it is purged enough
     //time_t logTime = tm - x*10;
@@ -606,20 +561,14 @@ static void testRecordAttemptPurge() {
     }
     AuthState *userState = NULL;
     AuthState *hostState = NULL;
-    if (abldb->get(abldb, info.user, &userState, USER))
-        printf("   Could not retrieve info for user %s.\n", info.user);
-    if (abldb->get(abldb, info.host, &hostState, HOST))
-        printf("   Could not retrieve info for host %s.\n", info.host);
+    CU_ASSERT_FALSE(abldb->get(abldb, info.user, &userState, USER));
+    CU_ASSERT_FALSE(abldb->get(abldb, info.host, &hostState, HOST));
     if (userState && hostState) {
         //for the user we purged every attempt older then 15 seconds, so we expect to see: now, now - 10 and our just logged time
-        if (getNofAttempts(userState) != 3) {
-            printf("   The current user state holds %d entries.\n", getNofAttempts(userState));
-        }
-        if (getNofAttempts(hostState) != 4) {
-            printf("   The current host state holds %d entries.\n", getNofAttempts(hostState));
-        }
+        CU_ASSERT_EQUAL(getNofAttempts(userState), 3);
+        CU_ASSERT_EQUAL(getNofAttempts(hostState), 4);
     }
-    abldb->commit_transaction(abldb);
+    CU_ASSERT_FALSE(abldb->commit_transaction(abldb));
     abldb->close(abldb);
     if (userState)
         destroyAuthState(userState);
@@ -661,10 +610,9 @@ static void testParseIpValid() {
                     u_int32_t parsedIp;
                     buffer[strLen] = '\0';
                     if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) != 0) {
-                        printf("   IP parsing failed for %s.\n", &buffer[0]);
+                        CU_FAIL("IP parsing failed.");
                     } else {
-                        if (parsedIp != expectedIp || netmask != -1)
-                            printf("   IP parsing failed for %s, result was not as expected\n", &buffer[0]);
+                        CU_ASSERT_FALSE(parsedIp != expectedIp || netmask != -1);
                     }
                 }
             }
@@ -696,23 +644,19 @@ static void testParseIpInvalid() {
                 for (; j < bufSize; ++j) {
                     snprintf(&buffer[0], 100, "%d.%d.%d.%d", invalidIpComponents[x], validIpComponents[y], validIpComponents[z], validIpComponents[j]);
                     size_t strLen = strlen(&buffer[0]);
-                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
-                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+                    CU_ASSERT_NOT_EQUAL(parseIP(&buffer[0], strLen, &netmask, &parsedIp), 0);
 
                     snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], invalidIpComponents[y], validIpComponents[z], validIpComponents[j]);
                     strLen = strlen(&buffer[0]);
-                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
-                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+                    CU_ASSERT_NOT_EQUAL(parseIP(&buffer[0], strLen, &netmask, &parsedIp), 0);
 
                     snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], validIpComponents[y], invalidIpComponents[z], validIpComponents[j]);
                     strLen = strlen(&buffer[0]);
-                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
-                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+                    CU_ASSERT_NOT_EQUAL(parseIP(&buffer[0], strLen, &netmask, &parsedIp), 0);
 
                     snprintf(&buffer[0], 100, "%d.%d.%d.%d", validIpComponents[x], validIpComponents[y], validIpComponents[z], invalidIpComponents[j]);
                     strLen = strlen(&buffer[0]);
-                    if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) == 0)
-                        printf("   IP parsing succeeded for %s.\n", &buffer[0]);
+                    CU_ASSERT_NOT_EQUAL(parseIP(&buffer[0], strLen, &netmask, &parsedIp), 0);
                 }
             }
         }
@@ -720,8 +664,7 @@ static void testParseIpInvalid() {
 
     x=0;
     for (; x< (int)(sizeof(invalidIps)/sizeof(char*)); ++x) {
-        if (parseIP(invalidIps[x], strlen(invalidIps[x]), &netmask, &parsedIp) == 0)
-            printf("   IP parsing succeeded for %s.\n", invalidIps[x]);
+        CU_ASSERT_NOT_EQUAL(parseIP(invalidIps[x], strlen(invalidIps[x]), &netmask, &parsedIp), 0);
     }
 }
 
@@ -735,10 +678,10 @@ static void testParseIpValidWithNetmask() {
         size_t strLen = strlen(&buffer[0]);
         buffer[strLen] = '0';
         buffer[strLen+1] = '\0';
-        if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) != 0)
-            printf("   IP parsing failed for %s.\n", invalidIps[x]);
-       else if (netmask != x) {
-            printf("   IP parsing failed for %s: Invalid netmwask returned.\n", invalidIps[x]);
+        if (parseIP(&buffer[0], strLen, &netmask, &parsedIp) != 0) {
+            CU_FAIL("IP parsing failed.");
+        } else if (netmask != x) {
+            CU_FAIL("IP parsing failed, an invalid netmwask was returned.");
         }
     }
 }
@@ -762,8 +705,7 @@ static void testParseIpInvalidWithNetmask() {
     u_int32_t parsedIp;
     int x=0;
     for (; x< (int)(sizeof(invalidIpsWithNetmask)/sizeof(char*)); ++x) {
-        if (parseIP(invalidIpsWithNetmask[x], strlen(invalidIpsWithNetmask[x]), &netmask, &parsedIp) == 0)
-            printf("   IP parsing succeeded for %s.\n", invalidIpsWithNetmask[x]);
+        CU_ASSERT_NOT_EQUAL(parseIP(invalidIpsWithNetmask[x], strlen(invalidIpsWithNetmask[x]), &netmask, &parsedIp), 0);
     }
 }
 
@@ -772,26 +714,18 @@ static void testInSameSubnet() {
     int x = 0;
     for (; x < 256; ++x) {
         u_int32_t host = getIp(192,168,1,x);
-        if (inSameSubnet(host, ip, 24) == 0) {
-            printf("   testInSameSubnet failed.\n");
-        }
+        CU_ASSERT_NOT_EQUAL(inSameSubnet(host, ip, 24), 0);
         if (x != 192) {
             host = getIp(x,168,1,1);
-            if (inSameSubnet(host, ip, 24)) {
-                printf("   testInSameSubnet failed.\n");
-            }
+            CU_ASSERT_FALSE(inSameSubnet(host, ip, 24));
         }
         if (x != 168) {
             host = getIp(192,x,1,1);
-            if (inSameSubnet(host, ip, 24)) {
-                printf("   testInSameSubnet failed.\n");
-            }
+            CU_ASSERT_FALSE(inSameSubnet(host, ip, 24));
         }
         if (x != 1) {
             host = getIp(192,168,x,1);
-            if (inSameSubnet(host, ip, 24)) {
-                printf("   testInSameSubnet failed.\n");
-            }
+            CU_ASSERT_FALSE(inSameSubnet(host, ip, 24));
         }
     }
 
@@ -799,19 +733,14 @@ static void testInSameSubnet() {
     for (x=0; x < 256; ++x) {
         u_int32_t host = getIp(128,128,128,x);
         if (x == 128) {
-            if (inSameSubnet(host, ip, 32) == 0)
-                printf("   testInSameSubnet failed.\n");
+            CU_ASSERT_NOT_EQUAL(inSameSubnet(host, ip, 32), 0);
         } else {
-            if (inSameSubnet(host, ip, 32))
-                printf("   testInSameSubnet failed.\n");
+            CU_ASSERT_FALSE(inSameSubnet(host, ip, 32));
         }
     }
 
-    if (inSameSubnet(getIp(1,1,1,1), ip, 0) == 0)
-        printf("   the 0 subnet should contain all ip's.\n");
-
-    if (inSameSubnet(getIp(255,255,255,255), ip, 0) == 0)
-        printf("   the 0 subnet should contain all ip's.\n");
+    CU_ASSERT_NOT_EQUAL(inSameSubnet(getIp(1,1,1,1), ip, 0), 0);
+    CU_ASSERT_NOT_EQUAL(inSameSubnet(getIp(255,255,255,255), ip, 0), 0);
 }
 
 static char *whiteListed[] = {
@@ -842,15 +771,11 @@ static void testWhitelistMatch() {
     const char *hostWhitelist = "10.10.10.10/24;1.1.1.1;2.2.2.2/32;blaat;192.168.1.1/24";
     int x=0;
     for (; x< (int)(sizeof(whiteListed)/sizeof(char*)); ++x) {
-        if (whitelistMatch(whiteListed[x], hostWhitelist, 1) == 0) {
-            printf("   %s was not whitelisted\n", whiteListed[x]);
-        }
+        CU_ASSERT_NOT_EQUAL(whitelistMatch(whiteListed[x], hostWhitelist, 1), 0);
     }
 
     for (x=0; x< (int)(sizeof(notWhiteListed)/sizeof(char*)); ++x) {
-        if (whitelistMatch(notWhiteListed[x], hostWhitelist, 1) != 0) {
-            printf("   %s was whitelisted\n", notWhiteListed[x]);
-        }
+        CU_ASSERT_EQUAL(whitelistMatch(notWhiteListed[x], hostWhitelist, 1), 0);
     }
 }
 
@@ -862,7 +787,7 @@ static void testSubstitute(const char *str, const char *user, const char *host, 
 
     int resultSize = prepare_string(str, &info, NULL);
     if (resultSize != (int)(strlen(result)+1)) {
-        printf("   substitute length was incorrect for \"%s\"\n", str);
+        CU_FAIL("Substitute length was incorrect.");
         return;
     }
     char *res = malloc(resultSize * sizeof(char));
@@ -871,10 +796,9 @@ static void testSubstitute(const char *str, const char *user, const char *host, 
         res[i] = 'a';
     resultSize = prepare_string(str, &info, res);
     if (resultSize != (int)(strlen(result)+1)) {
-        printf("   actual substitute length was incorrect for \"%s\"\n", str);
+        CU_FAIL("Actual substitute length was incorrect.");
     } else {
-        if (strcmp(res, result) != 0)
-            printf("   substitute was incorrect \"%s\" != \"%s\"\n", res, str);
+        CU_ASSERT_STRING_EQUAL(res, result);
     }
     free(res);
 }
@@ -907,53 +831,48 @@ static void testSubstituteWithPercent() {
     testSubstitute("%%command %%%u %%%h %%%s %%", "%user%", "%host%", "%service%", "%command %%user% %%host% %%service% %");
 }
 
-void testAbl(const char *dbModule) {
-    if (!dbModule || !*dbModule) {
-        printf("Failed to start Abl test (no database module).\n");
-    }
+static int ablTestInit() {
     if (args)
         config_free();
     config_create();
     args->db_module = dbModule;
-    printf("Abl test start with database %s.\n", dbModule);
-    printf(" Starting testCheckAttempt.\n");
-    testCheckAttempt();
-    printf(" Starting testCheckAttemptOnlyHost.\n");
-    testCheckAttemptOnlyHost();
-    printf(" Starting testCheckAttemptOnlyUser.\n");
-    testCheckAttemptOnlyUser();
-    printf(" Starting testRecordAttempt.\n");
-    testRecordAttempt();
-    printf(" Starting testRecordAttemptOnlyHost.\n");
-    testRecordAttemptOnlyHost();
-    printf(" Starting testRecordAttemptOnlyUser.\n");
-    testRecordAttemptOnlyUser();
-    printf(" Starting testRecordAttemptWhitelistHost.\n");
-    testRecordAttemptWhitelistHost();
-    printf(" Starting testRecordAttemptPurge.\n");
-    testRecordAttemptPurge();
-    printf(" Starting testParseIpValid.\n");
-    testParseIpValid();
-    printf(" Starting testParseIpInvalid.\n");
-    testParseIpInvalid();
-    printf(" Starting testParseIpValidWithNetmask.\n");
-    testParseIpValidWithNetmask();
-    printf(" Starting testParseIpInvalidWithNetmask.\n");
-    testParseIpInvalidWithNetmask();
-    printf(" Starting testInSameSubnet.\n");
-    testInSameSubnet();
-    printf(" Starting testWhitelistMatch.\n");
-    testWhitelistMatch();
-    printf(" Starting testSubstituteNormal.\n");
-    testSubstituteNormal();
-    printf(" Starting testNoSubstitute.\n");
-    testNoSubstitute();
-    printf(" Starting testEmptySubstitute.\n");
-    testEmptySubstitute();
-    printf(" Starting testSubstituteWithPercent.\n");
-    testSubstituteWithPercent();
-    printf("Abl test end.\n");
+    return 0;
+}
+
+static int ablTestCleanup() {
     config_free();
+    dbModule = NULL;
+    return 0;
+}
+
+void addAblTests(const char *module) {
+    if (!module || !*module) {
+        printf("Failed to add the Abl tests (no database module).\n");
+        return;
+    }
+    dbModule = module;
+    CU_pSuite pSuite = NULL;
+    pSuite = CU_add_suite("Abl tests", ablTestInit, ablTestCleanup);
+    if (NULL == pSuite)
+        return;
+    CU_add_test(pSuite, "testCheckAttempt", testCheckAttempt);
+    CU_add_test(pSuite, "testCheckAttemptOnlyHost", testCheckAttemptOnlyHost);
+    CU_add_test(pSuite, "testCheckAttemptOnlyUser", testCheckAttemptOnlyUser);
+    CU_add_test(pSuite, "testRecordAttempt", testRecordAttempt);
+    CU_add_test(pSuite, "testRecordAttemptOnlyHost", testRecordAttemptOnlyHost);
+    CU_add_test(pSuite, "testRecordAttemptOnlyUser", testRecordAttemptOnlyUser);
+    CU_add_test(pSuite, "testRecordAttemptWhitelistHost", testRecordAttemptWhitelistHost);
+    CU_add_test(pSuite, "testRecordAttemptPurge", testRecordAttemptPurge);
+    CU_add_test(pSuite, "testParseIpValid", testParseIpValid);
+    CU_add_test(pSuite, "testParseIpInvalid", testParseIpInvalid);
+    CU_add_test(pSuite, "testParseIpValidWithNetmask", testParseIpValidWithNetmask);
+    CU_add_test(pSuite, "testParseIpInvalidWithNetmask", testParseIpInvalidWithNetmask);
+    CU_add_test(pSuite, "testInSameSubnet", testInSameSubnet);
+    CU_add_test(pSuite, "testWhitelistMatch", testWhitelistMatch);
+    CU_add_test(pSuite, "testSubstituteNormal", testSubstituteNormal);
+    CU_add_test(pSuite, "testNoSubstitute", testNoSubstitute);
+    CU_add_test(pSuite, "testEmptySubstitute", testEmptySubstitute);
+    CU_add_test(pSuite, "testSubstituteWithPercent", testSubstituteWithPercent);
 }
 
 static void testCommand(const char *cmd, int exitCode) {
@@ -965,25 +884,35 @@ static void testCommand(const char *cmd, int exitCode) {
     cmdArr[2] = &buff[0];
     cmdArr[3] = NULL;
     int result = ablExec(&cmdArr[0]);
-    if (result != exitCode) {
-        printf("   ablExec exit code: \"%d\" != \"%d\"\n", result, exitCode);
-    }
+    CU_ASSERT_EQUAL(result, exitCode);
     free(cmdArr);
 }
 
-void testExternalCommand(const char *cmd) {
-    printf("testExternalCommand start.\n");
-    printf(" Basic exitcode tests.\n");
+static void testNormalCommand() {
     int i = 0;
     for (; i < 10; ++i ) {
-        testCommand(cmd, i);
+        testCommand(exePath, i);
     }
-    printf(" Non existing command test.\n");
+}
+
+static void testNonExistingCommand() {
     testCommand("command_that_doenst_exist", 255);
-    printf(" Invalid input test.\n");
+}
+
+static void testInvalidInputCommand() {
     testCommand(0, -1);
     testCommand("", -1);
-    printf("testExternalCommand end.\n");
+}
+
+void addExternalCommandTests(const char *cmd) {
+    exePath = cmd;
+    CU_pSuite pSuite = NULL;
+    pSuite = CU_add_suite("External command tests", NULL, NULL);
+    if (NULL == pSuite)
+        return;
+    CU_add_test(pSuite, "testNormalCommand", testNormalCommand);
+    CU_add_test(pSuite, "testNonExistingCommand", testNonExistingCommand);
+    CU_add_test(pSuite, "testInvalidInputCommand", testInvalidInputCommand);
 }
 
 static const char **s_expected_arg = NULL;
@@ -996,18 +925,16 @@ static int execFun(char *const arg[]) {
     while (s_expected_arg[i]) {
         if (arg[i]) {
             if (strcmp(s_expected_arg[i], arg[i]) != 0) {
-                printf("   execFun: argument mismatch \"%s\" != \"%s\"\n", arg[i], s_expected_arg[i]);
+                CU_FAIL("execFun: argument mismatch.");
                 return s_execFun_exitCode;
             }
         } else {
-            printf("   execFun: missing argument \"%s\"\n", s_expected_arg[i]);
+            CU_FAIL("execFun: missing argument.");
             return s_execFun_exitCode;
         }
         ++i;
     }
-    if (arg[i] != NULL) {
-        printf("   we got more parameters than expected: \"%s\"", arg[i]);
-    }
+    CU_ASSERT_EQUAL(arg[i], NULL);
     return s_execFun_exitCode;
 }
 
@@ -1025,35 +952,28 @@ static void testRunCommandHelper(const char *origCommand, int isOk, const abl_in
         s_execFun_called = 0;
         s_execFun_exitCode = i;
         int returnCode = _runCommand(origCommand, info, execFun);
-        if (s_execFun_called != isOk) {
-            if (isOk)
-                printf("   Expected the command \"%s\" to be called.", arg1);
-            else
-                printf("   Did not expect the command \"%s\" to be called.", arg1);
-        }
-        if (returnCode != s_execFun_exitCode) {
-            printf("   Expected exit code \"%d\" instead of \"%d\".", s_execFun_exitCode, returnCode);
-        }
+        CU_ASSERT_EQUAL(s_execFun_called, isOk);
+        CU_ASSERT_EQUAL(returnCode, s_execFun_exitCode);
     }
 }
 
-
-void testRunCommand() {
-    printf("testRunCommand start.\n");
+static void commandTest() {
     abl_info info;
     info.host = "127.0.0.1";
     info.user = "mooh";
     info.service = "sharing";
-    printf(" basic command test.\n");
     testRunCommandHelper("[command]", 1, &info, "command", NULL, NULL, NULL);
-    printf(" command with substitution test.\n");
     testRunCommandHelper("[command %u]", 1, &info, "command mooh", NULL, NULL, NULL);
-    printf(" command with some shell code test.\n");
     testRunCommandHelper("[command | > %u %h %s]", 1, &info, "command | > mooh 127.0.0.1 sharing", NULL, NULL, NULL);
-
     testRunCommandHelper("[command] [arg1] [%u] [%h]", 1, &info, "command", "arg1", "mooh", "127.0.0.1");
-
     info.user = "[lol]";
     testRunCommandHelper("[command %u] [%u]", 1, &info, "command [lol]", "[lol]", NULL, NULL);
-    printf("testRunCommand end.\n");
+}
+
+void addRunCommandTests() {
+    CU_pSuite pSuite = NULL;
+    pSuite = CU_add_suite("Run command tests", NULL, NULL);
+    if (NULL == pSuite)
+        return;
+    CU_add_test(pSuite, "commandTest", commandTest);
 }

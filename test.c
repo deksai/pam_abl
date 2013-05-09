@@ -75,12 +75,19 @@ int main(int argc, const char *argv[]) {
         return 1;
     }
     log_quiet_mode = 1;
-    runTypeTests();
-    runDatabaseTests();
-    runRuleTests();
-    testAbl(argv[1]);
-    testExternalCommand(argv[0]);
-    testRunCommand();
-    testConfig();
+    if (CU_initialize_registry() != CUE_SUCCESS)
+        return 1;
+    addTypeTests();
+    addDatabaseTests();
+    addRuleTests();
+    addExternalCommandTests(argv[0]);
+    addRunCommandTests();
+    addConfigTests();
+    addAblTests(argv[1]);
+    CU_basic_set_mode(CU_BRM_VERBOSE);
+    CU_basic_run_tests();
+    CU_cleanup_registry();
+    printf("\n");
+    runPerformanceTest();
     return 0;
 }

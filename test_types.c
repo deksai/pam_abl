@@ -56,31 +56,18 @@ static void compareAttempt(AuthState *state, time_t pTime, BlockReason reason, c
     AuthAttempt attempt;
     memset(&attempt, 0, sizeof(AuthState));
     if (nextAttempt(state, &attempt)) {
-        printf("   Could not retrieve the next attempt.\n");
+        CU_FAIL("Could not retrieve the next attempt.");
         return;
     }
 
-    if (attempt.m_time != pTime) {
-        printf("   Attempt time was incorrect.\n");
-    }
-
-    if (attempt.m_reason != reason) {
-        printf("   Block reason was incorrect.\n");
-    }
-
-    if (strcmp(attempt.m_service, service) != 0) {
-        printf("   Service was incorrect.\n");
-    }
-
-    if (strcmp(attempt.m_userOrHost, user) != 0) {
-        printf("   User was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(attempt.m_time, pTime);
+    CU_ASSERT_EQUAL(attempt.m_reason, reason);
+    CU_ASSERT_STRING_EQUAL(attempt.m_service, service);
+    CU_ASSERT_STRING_EQUAL(attempt.m_userOrHost, user);
 
     if (isLastAttempt) {
         memset(&attempt, 0, sizeof(AuthState));
-        if (!nextAttempt(state, &attempt)) {
-            printf("   We could read another Attempt.\n");
-        }
+        CU_ASSERT(nextAttempt(state, &attempt));
     }
 }
 
@@ -101,25 +88,20 @@ static void testMultipleAttempts() {
     }
     AuthState *result;
     if (createAuthState(&buffer[0], (size_t)(bufferPtr - &buffer[0]), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
     //write over the buffer, make sure that AuthState does not read our old buffer
     memset(&buffer[0], 3, sizeof(buffer));
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-
-    if (getNofAttempts(result) != 10) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 10);
 
     for (counter = 0; counter < 10; ++counter) {
         sprintf(&userBuffer[0], "User_%d", counter);
@@ -147,24 +129,20 @@ static void testMultipleAttemptsLastIncomplete() {
     }
     AuthState *result;
     if (createAuthState(&buffer[0], ((size_t)(bufferPtr - &buffer[0])) - 2, &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
     //write over the buffer, make sure that AuthState does not read our old buffer
     memset(&buffer[0], 3, sizeof(buffer));
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-    if (getNofAttempts(result) != 5) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 5);
 
     for (counter = 0; counter < 4; ++counter) {
         sprintf(&userBuffer[0], "User2_%d", counter);
@@ -174,9 +152,7 @@ static void testMultipleAttemptsLastIncomplete() {
 
     AuthAttempt attempt;
     memset(&attempt, 0, sizeof(AuthState));
-    if (!nextAttempt(result, &attempt)) {
-        printf("   The first attempt could be retrieved.\n");
-    }
+    CU_ASSERT(nextAttempt(result, &attempt));
     destroyAuthState(result);
 }
 
@@ -191,21 +167,19 @@ static void testCorrectOneAttempt() {
 
     AuthState *result;
     if (createAuthState(&buffer[0], (size_t)(bufferPtr - &buffer[0]), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
     //write over the buffer, make sure that AuthState does not read our old buffer
     memset(&buffer[0], 3, sizeof(buffer));
 
-    if (getState(result) != BLOCKED) {
-        printf("   State was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), BLOCKED);
 
     compareAttempt(result, 11, USER_BLOCKED, user, service, 1);
 
@@ -215,30 +189,24 @@ static void testCorrectOneAttempt() {
 static void testEmptyService() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     int i;
     for (i = 0; i < 10; ++i) {
         //addAttempt(AuthState *state, BlockReason reason, time_t pTime, const char *userOrHost, const char *service)
-        if (addAttempt(state, HOST_BLOCKED, i, "", "", 0, 0)) {
-            printf("   Could not add an attempt.\n");
-        }
+        CU_ASSERT_FALSE(addAttempt(state, HOST_BLOCKED, i, "", "", 0, 0));
     }
     firstAttempt(state);
     AuthAttempt attempt;
     i = 0;
     while (nextAttempt(state, &attempt) == 0) {
-        if (*attempt.m_service)
-            printf("   We added an empty service, yet a real service is returned.\n");
-        if (*attempt.m_userOrHost)
-            printf("   We added an empty data field, yet a real service is returned.\n");
-        if (attempt.m_time != i)
-            printf("   Time was not matched.\n");
+        CU_ASSERT_FALSE(*attempt.m_service);
+        CU_ASSERT_FALSE(*attempt.m_userOrHost);
+        CU_ASSERT_EQUAL(attempt.m_time, i);
         ++i;
     }
-    if (i != 10)
-        printf("   We added 10 attempts, yet %d were returned.\n", i);
+    CU_ASSERT_EQUAL(i, 10);
     destroyAuthState(state);
 }
 
@@ -247,14 +215,12 @@ static void testEmptyAttempts() {
     writeHeader(&buffer[0], CLEAR, 0);
     AuthState *result;
     if (createAuthState(&buffer[0], sizeof(int)+sizeof(unsigned int), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     AuthAttempt attempt;
-    if (!nextAttempt(result, &attempt)) {
-        printf("   The first attempt could be retrieved.\n");
-    }
+    CU_ASSERT(nextAttempt(result, &attempt));
     destroyAuthState(result);
 }
 
@@ -263,29 +229,27 @@ static void testCreateEmptyAttempt() {
     writeHeader(&buffer[0], CLEAR, 0);
     AuthState *result;
     if (createAuthState(&buffer[0], sizeof(int)+sizeof(unsigned int), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     AuthState *empty = NULL;
     if (createEmptyState(CLEAR, &empty)) {
-        printf("   Could not create empty AuthState.\n");
+        CU_FAIL("Could not create empty AuthState.");
         return;
     }
 
     if (!empty) {
-        printf("   Creation succeeded, yet no valid pointer.\n");
+        CU_FAIL("Creation succeeded, yet no valid pointer.");
         return;
     }
 
     if (result->m_usedSize != empty->m_usedSize) {
-        printf("   The size of the empty State does not match.");
+        CU_FAIL("The size of the empty State does not match.");
         return;
     }
 
-    if (memcmp(result->m_data, empty->m_data, empty->m_usedSize)) {
-        printf("   The data does not match.\n");
-    }
+    CU_ASSERT_FALSE(memcmp(result->m_data, empty->m_data, empty->m_usedSize));
     destroyAuthState(result);
     destroyAuthState(empty);
 }
@@ -302,7 +266,7 @@ static void testAddAttempt() {
     writeHeader(&tmp[0], CLEAR, 0);
     AuthState *result;
     if (createAuthState(&tmp[0], sizeof(int)+sizeof(unsigned int), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
@@ -313,17 +277,17 @@ static void testAddAttempt() {
         bufferPtr = writeAttempt(bufferPtr, counter, AUTH_FAILED, &userBuffer[0], &serviceBuffer[0]);
 
         if (addAttempt(result, AUTH_FAILED, counter, &userBuffer[0], &serviceBuffer[0], 0, 0)) {
-            printf("   Could not add an attempt.\n");
+            CU_FAIL("Could not add an attempt.");
             return;
         }
     }
 
     if (result->m_usedSize != (size_t)(bufferPtr - &buffer[0])) {
-        printf("   The buffer sizes do not match.\n");
+        CU_FAIL("The buffer sizes do not match.");
         return;
     } else {
         if (memcmp(&buffer[0], result->m_data, result->m_usedSize)) {
-            printf("   The buffers are not equal.\n");
+            CU_FAIL("The buffers are not equal.");
             return;
         }
     }
@@ -345,24 +309,20 @@ static void testInvalidSize() {
         AuthState *result;
         //this should still succeed
         if (createAuthState(&buffer[0], reportSize, &result)) {
-            printf("   Could not create AuthState from buffer.\n");
+            CU_FAIL("Could not create AuthState from buffer.");
             continue;
         }
 
         AuthAttempt attempt;
         memset(&attempt, 0, sizeof(AuthState));
-        if (!nextAttempt(result, &attempt)) {
-            printf("   The first attempt could be retrieved while giving size %d.\n", (int)reportSize);
-        }
+        CU_ASSERT(nextAttempt(result, &attempt));
         destroyAuthState(result);
     }
 
     AuthState *temp = NULL;
     //if we give it a real small size, we expect it to fail while creating the AuthState
     for (reportSize = 0; reportSize < sizeof(unsigned int)+sizeof(int); ++reportSize) {
-        if (!createAuthState(&buffer[0], reportSize, &temp)) {
-            printf("   Could create AuthState from buffer.\n");
-        }
+        CU_ASSERT(createAuthState(&buffer[0], reportSize, &temp));
     }
 }
 
@@ -382,12 +342,11 @@ static void testPurgeNothingRemoved() {
     }
     AuthState *result;
     if (createAuthState(&buffer[0], (size_t)(bufferPtr - &buffer[0]), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
-        return;
+        CU_FAIL("Could not create AuthState from buffer.");
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
@@ -397,12 +356,8 @@ static void testPurgeNothingRemoved() {
     //let's purge the damn thing, nothing should have been deleted
     purgeAuthState(result, 5);
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-    if (getNofAttempts(result) != 10) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 10);
 
     for (counter = 0; counter < 10; ++counter) {
         sprintf(&userBuffer[0], "User_%d", counter);
@@ -428,12 +383,12 @@ static void testPurgeSomeRemoved() {
     }
     AuthState *result;
     if (createAuthState(&buffer[0], (size_t)(bufferPtr - &buffer[0]), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
@@ -443,12 +398,8 @@ static void testPurgeSomeRemoved() {
     //let's purge the damn thing, some of them should be deleted
     purgeAuthState(result, 5);
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-    if (getNofAttempts(result) != 5) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 5);
 
     for (counter = 5; counter < 10; ++counter) {
         sprintf(&userBuffer[0], "User_%d", counter);
@@ -474,12 +425,12 @@ static void testPurgeAllButOneRemoved() {
     }
     AuthState *result;
     if (createAuthState(&buffer[0], (size_t)(bufferPtr - &buffer[0]), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
@@ -489,12 +440,8 @@ static void testPurgeAllButOneRemoved() {
     //let's purge the damn thing, all but one should be removed
     purgeAuthState(result, 9);
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-    if (getNofAttempts(result) != 1) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 1);
 
     // is the 9-th attempt still here?
     sprintf(&userBuffer[0], "User_%d", 9);
@@ -508,24 +455,18 @@ static void testPurgeEmptyAttemptList() {
     writeHeader(&buffer[0], CLEAR, 0);
     AuthState *result;
     if (createAuthState(&buffer[0], sizeof(int)+sizeof(unsigned int), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     //purging will not do anything normally, because there is nothing to remove
     purgeAuthState(result, 9);
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-    if (getNofAttempts(result) != 0) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 0);
 
     AuthAttempt attempt;
-    if (!nextAttempt(result, &attempt)) {
-        printf("   The first attempt could be retrieved.\n");
-    }
+    CU_ASSERT(nextAttempt(result, &attempt));
     destroyAuthState(result);
 }
 
@@ -545,12 +486,12 @@ static void testPurgeAllRemoved() {
     }
     AuthState *result;
     if (createAuthState(&buffer[0], (size_t)(bufferPtr - &buffer[0]), &result)) {
-        printf("   Could not create AuthState from buffer.\n");
+        CU_FAIL("Could not create AuthState from buffer.");
         return;
     }
 
     if (!result) {
-        printf("   AutState was not filled in.\n");
+        CU_FAIL("AutState was not filled in.");
         return;
     }
 
@@ -560,17 +501,11 @@ static void testPurgeAllRemoved() {
     //let's purge the damn thing, all should be removed
     purgeAuthState(result, 1000);
 
-    if (getState(result) != CLEAR) {
-        printf("   State was incorrect.\n");
-    }
-    if (getNofAttempts(result) != 0) {
-        printf("   Number of attempts was incorrect.\n");
-    }
+    CU_ASSERT_EQUAL(getState(result), CLEAR);
+    CU_ASSERT_EQUAL(getNofAttempts(result), 0);
 
     AuthAttempt attempt;
-    if (!nextAttempt(result, &attempt)) {
-        printf("   The first attempt could be retrieved.\n");
-    }
+    CU_ASSERT(nextAttempt(result, &attempt));
 
     destroyAuthState(result);
 }
@@ -580,7 +515,7 @@ static void testPurgePerformance(int maxCount) {
     char userBuffer[100];
     char serviceBuffer[100];
     char *bufferPtr = buffer;
-
+    printf("Type performance test with %d attempts:\n", maxCount);
     bufferPtr = writeHeader(bufferPtr, CLEAR, maxCount);
 
     clock_t begin = clock();
@@ -591,7 +526,7 @@ static void testPurgePerformance(int maxCount) {
         bufferPtr = writeAttempt(bufferPtr, counter, AUTH_FAILED, &userBuffer[0], &serviceBuffer[0]);
     }
     AuthState *result;
-    printf("      %d attempts costs us %d bytes.\n", maxCount, (int)(bufferPtr - buffer));
+    printf("   - %d bytes.\n", (int)(bufferPtr - buffer));
     if (createAuthState(buffer, (size_t)(bufferPtr - buffer), &result)) {
         printf("   Could not create AuthState from buffer.\n");
         return;
@@ -603,13 +538,13 @@ static void testPurgePerformance(int maxCount) {
     }
     clock_t end = clock();
     double elapsed = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("      Creating %d entries took us %f seconds.\n", maxCount, elapsed);
+    printf("   - creating took us %f seconds.\n", elapsed);
 
     begin = clock();
     purgeAuthState(result, maxCount + 1000);
     end = clock();
     elapsed = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("      Iterating %d entries took us %f seconds.\n", maxCount, elapsed);
+    printf("   - iterating took us %f seconds.\n", elapsed);
 
     destroyAuthState(result);
     free(buffer);
@@ -621,7 +556,7 @@ static void testAddAttemptLimitReached() {
 
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty AuthState.\n");
+        CU_FAIL("Could not create an empty AuthState.");
         return;
     }
 
@@ -632,7 +567,7 @@ static void testAddAttemptLimitReached() {
         sprintf(&serviceBuffer[0], "Service_%d", counter);
 
         if (addAttempt(state, AUTH_FAILED, counter, &userBuffer[0], &serviceBuffer[0], 5, 10)) {
-            printf("   Could not add an attempt.\n");
+            CU_FAIL("Could not add an attempt.");
             return;
         }
         ++expected;
@@ -640,22 +575,17 @@ static void testAddAttemptLimitReached() {
             expected = 5;
         unsigned int nof = getNofAttempts(state);
         if (nof != expected) {
-            printf("   The count is wrong, expected %u, got %u.\n", expected, nof);
+            CU_FAIL("The count is wrong.");
         } else {
             firstAttempt(state);
             int start = counter - expected + 1;
             AuthAttempt attempt;
             while (nextAttempt(state, &attempt) == 0) {
                 sprintf(&userBuffer[0], "User_%d", start);
-                if (strcmp(attempt.m_userOrHost, &userBuffer[0]) != 0) {
-                    printf("   Expected username %s, got %s.\n", &userBuffer[0], attempt.m_userOrHost);
-                    break;
-                }
+                CU_ASSERT_STRING_EQUAL(attempt.m_userOrHost, &userBuffer[0]);
                 ++start;
             }
-            if (start != counter+1) {
-                printf("   State is not fully iteratable.\n");
-            }
+            CU_ASSERT_EQUAL(start, counter+1);
         }
     }
     destroyAuthState(state);
@@ -667,7 +597,7 @@ static void testAddAttemptLowerLimitZero() {
 
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty AuthState.\n");
+        CU_FAIL("Could not create an empty AuthState.");
         return;
     }
 
@@ -678,7 +608,7 @@ static void testAddAttemptLowerLimitZero() {
         sprintf(&serviceBuffer[0], "Service_%d", counter);
 
         if (addAttempt(state, AUTH_FAILED, counter, &userBuffer[0], &serviceBuffer[0], 0, 10)) {
-            printf("   Could not add an attempt.\n");
+            CU_FAIL("Could not add an attempt.");
             return;
         }
         ++expected;
@@ -686,7 +616,7 @@ static void testAddAttemptLowerLimitZero() {
             expected = 1;
         unsigned int nof = getNofAttempts(state);
         if (nof != expected) {
-            printf("   The count is wrong, expected %u, got %u.\n", expected, nof);
+            CU_FAIL("The count is wrong.\n");
         } else {
             firstAttempt(state);
             int start = counter - expected + 1;
@@ -694,14 +624,12 @@ static void testAddAttemptLowerLimitZero() {
             while (nextAttempt(state, &attempt) == 0) {
                 sprintf(&userBuffer[0], "User_%d", start);
                 if (strcmp(attempt.m_userOrHost, &userBuffer[0]) != 0) {
-                    printf("   Expected username %s, got %s.\n", &userBuffer[0], attempt.m_userOrHost);
+                    CU_FAIL("Receiven an unexpected username.");
                     break;
                 }
                 ++start;
             }
-            if (start != counter+1) {
-                printf("   State is not fully iteratable.\n");
-            }
+            CU_ASSERT_EQUAL(start, counter+1);
         }
     }
     destroyAuthState(state);
@@ -713,7 +641,7 @@ static void testAddAttemptLimitsTheSame() {
 
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty AuthState.\n");
+        CU_FAIL("Could not create an empty AuthState.");
         return;
     }
 
@@ -723,18 +651,16 @@ static void testAddAttemptLimitsTheSame() {
         sprintf(&serviceBuffer[0], "Service_%d", counter);
 
         if (addAttempt(state, AUTH_FAILED, counter, &userBuffer[0], &serviceBuffer[0], 10, 10)) {
-            printf("   Could not add an attempt.\n");
+            CU_FAIL("Could not add an attempt.");
             return;
         }
 
         unsigned int nof = getNofAttempts(state);
         if (counter <= 10) {
-            if ((int)nof != counter) {
-                printf("   The count is wrong, expected %u, got %u.\n", counter, nof);
-            }
+            CU_ASSERT_EQUAL((int)nof, counter);
         } else {
             if (nof != 10) {
-                printf("   The count is wrong, expected 10, got %u.\n", nof);
+                CU_FAIL("The count is wrong, expected 10.");
             } else {
                 firstAttempt(state);
                 int start = counter - 10 + 1;
@@ -742,56 +668,43 @@ static void testAddAttemptLimitsTheSame() {
                 while (nextAttempt(state, &attempt) == 0) {
                     sprintf(&userBuffer[0], "User_%d", start);
                     if (strcmp(attempt.m_userOrHost, &userBuffer[0]) != 0) {
-                        printf("   Expected username %s, got %s.\n", &userBuffer[0], attempt.m_userOrHost);
+                        CU_FAIL("Received un unexpected username.");
                         break;
                     }
                     ++start;
                 }
-                if (start != counter+1) {
-                    printf("   State is not fully iteratable.\n");
-                }
+                CU_ASSERT_EQUAL(start, counter+1);
             }
         }
     }
     destroyAuthState(state);
 }
 
-void runTypeTests() {
-    printf("Type test start.\n");
-    printf(" Starting testCorrectOneAttempt.\n");
-    testCorrectOneAttempt();
-    printf(" Starting testEmptyAttempts.\n");
-    testEmptyAttempts();
-    printf(" Starting testCreateEmptyAttempt.\n");
-    testCreateEmptyAttempt();
-    printf(" Starting testInvalidSize.\n");
-    testInvalidSize();
-    printf(" Starting testMultipleAttempts.\n");
-    testMultipleAttempts();
-    printf(" Starting testMultipleAttemptsLastIncomplete.\n");
-    testMultipleAttemptsLastIncomplete();
-    printf(" Starting testAddAttempt.\n");
-    testAddAttempt();
-    printf(" Starting testAddAttemptLimitReached.\n");
-    testAddAttemptLimitReached();
-    printf(" Starting testAddAttemptLowerLimitZero.\n");
-    testAddAttemptLowerLimitZero();
-    printf(" Starting testAddAttemptLimitsTheSame.\n");
-    testAddAttemptLimitsTheSame();
-    printf(" Starting testEmptyService.\n");
-    testEmptyService();
-    printf(" Starting testPurgeNothingRemoved.\n");
-    testPurgeNothingRemoved();
-    printf(" Starting testPurgeSomeRemoved.\n");
-    testPurgeSomeRemoved();
-    printf(" Starting testPurgeAllButOneRemoved.\n");
-    testPurgeAllButOneRemoved();
-    printf(" Starting testPurgeEmptyAttemptList.\n");
-    testPurgeEmptyAttemptList();
-    printf(" Starting testPurgeAllRemoved.\n");
-    testPurgeAllRemoved();
-    printf(" Starting testPurgePerformance.\n");
+
+void addTypeTests() {
+    CU_pSuite pSuite = NULL;
+    pSuite = CU_add_suite("TypeTests", NULL, NULL);
+    if (NULL == pSuite)
+        return;
+    CU_add_test(pSuite, "testCorrectOneAttempt", testCorrectOneAttempt);
+    CU_add_test(pSuite, "testEmptyAttempts", testEmptyAttempts);
+    CU_add_test(pSuite, "testCreateEmptyAttempt", testCreateEmptyAttempt);
+    CU_add_test(pSuite, "testInvalidSize", testInvalidSize);
+    CU_add_test(pSuite, "testMultipleAttempts", testMultipleAttempts);
+    CU_add_test(pSuite, "testMultipleAttemptsLastIncomplete", testMultipleAttemptsLastIncomplete);
+    CU_add_test(pSuite, "testAddAttempt", testAddAttempt);
+    CU_add_test(pSuite, "testAddAttemptLimitReached", testAddAttemptLimitReached);
+    CU_add_test(pSuite, "testAddAttemptLowerLimitZero", testAddAttemptLowerLimitZero);
+    CU_add_test(pSuite, "testAddAttemptLimitsTheSame", testAddAttemptLimitsTheSame);
+    CU_add_test(pSuite, "testEmptyService", testEmptyService);
+    CU_add_test(pSuite, "testPurgeNothingRemoved", testPurgeNothingRemoved);
+    CU_add_test(pSuite, "testPurgeSomeRemoved", testPurgeSomeRemoved);
+    CU_add_test(pSuite, "testPurgeAllButOneRemoved", testPurgeAllButOneRemoved);
+    CU_add_test(pSuite, "testPurgeEmptyAttemptList", testPurgeEmptyAttemptList);
+    CU_add_test(pSuite, "testPurgeAllRemoved", testPurgeAllRemoved);
+}
+
+void runPerformanceTest() {
     testPurgePerformance(1000);
     testPurgePerformance(100000);
-    printf("Type tests end.\n");
 }

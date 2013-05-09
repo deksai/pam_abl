@@ -30,7 +30,7 @@ static void testSplit(const char *cmd, int nofParts, const char **parts) {
     char *command = strdup(cmd);
     int nof = splitCommand(command, NULL);
     if (nof != nofParts) {
-        printf("   The number of parts for \"%s\" is not %d.\n", command, nofParts);
+        CU_FAIL("The number of parts of the command does not match.");
         free(command);
         return;
     }
@@ -42,7 +42,7 @@ static void testSplit(const char *cmd, int nofParts, const char **parts) {
             resultParts[p] = (char*)(0x1);
         nof = splitCommand(command, resultParts);
         if (nof != nofParts) {
-            printf("   While actually parsing: The number of parts for \"%s\" is not %d.\n", command, nofParts);
+            CU_FAIL("While actually parsing: The number of parts does not match.");
             free(command);
             free(resultParts);
             return;
@@ -50,7 +50,7 @@ static void testSplit(const char *cmd, int nofParts, const char **parts) {
         int i = 0;
         for (i = 0; i < nofParts; ++i) {
             if (strcmp(parts[i], resultParts[i]) != 0) {
-                printf("   While comparing parts: \"%s\" != \"%s\"\n", resultParts[i], parts[i]);
+                CU_FAIL("While comparing parts: Some parts are different.");
                 free(command);
                 free(resultParts);
                 return;
@@ -65,8 +65,7 @@ static void testSplit(const char *cmd, int nofParts, const char **parts) {
 static void testSplitExpectError(const char *cmd) {
     char *command = strdup(cmd);
     int nof = splitCommand(command, NULL);
-    if (nof >= 0)
-        printf("   Expected an error while splitting \"%s\".\n", command);
+    CU_ASSERT_FALSE(nof >= 0);
     free(command);
 }
 
@@ -200,17 +199,10 @@ static void testGoodModuleArgsNoFile() {
                                     config_free();
                                 config_create();
                                 if (config_parse_module_args(x, argv, &result)) {
-                                    printf("   the module arguments failed to parse\n");
+                                    CU_FAIL("The module arguments failed to parse.");
                                 } else {
-                                    if (result != expectedResult) {
-                                        printf("   not all arguments were parsed correctly\n");
-                                    }
-                                    if (debugEnabled && !args->debug) {
-                                        printf("   debug was not enabled\n");
-                                    }
-                                    if (!debugEnabled && args->debug) {
-                                        printf("   debug was enabled\n");
-                                    }
+                                    CU_ASSERT_EQUAL(result, expectedResult);
+                                    CU_ASSERT_EQUAL(debugEnabled, args->debug);
                                 }
                                 config_free();
                             }
@@ -232,9 +224,7 @@ static void testInvalidModuleArgsNoFile() {
         "log_both"
     };
     ModuleAction result;
-    if (config_parse_module_args(4, (const char **)(&testSet), &result) == 0) {
-        printf("   the invalid module arguments parsed correctly\n");
-    }
+    CU_ASSERT_NOT_EQUAL(config_parse_module_args(4, (const char **)(&testSet), &result), 0);
     config_free();
 }
 
@@ -248,37 +238,25 @@ static void testValidModuleArgsInvalidFile() {
         "log_both"
     };
     ModuleAction result;
-    if (config_parse_module_args(4, (const char **)(&testSet), &result) == 0) {
-        printf("   the invalid module arguments parsed correctly\n");
-    }
+    CU_ASSERT_NOT_EQUAL(config_parse_module_args(4, (const char **)(&testSet), &result), 0);
     config_free();
 }
 
-void testConfig() {
-    printf("Config test start.\n");
-    printf(" Starting testCommandNormal.\n");
-    testCommandNormal();
-    printf(" Starting testIgnoreNonEnclosed.\n");
-    testIgnoreNonEnclosed();
-    printf(" Starting testEmpty.\n");
-    testEmpty();
-    printf(" Starting testWithEscapeChars.\n");
-    testWithEscapeChars();
-    printf(" Starting testEscapeBracket.\n");
-    testEscapeBracket();
-    printf(" Starting testMultipleOpen.\n");
-    testMultipleOpen();
-    printf(" Starting testNoClosing.\n");
-    testNoClosing();
-    printf(" Starting testEmptyBrackets.\n");
-    testEmptyBrackets();
-    printf(" Starting testNoCommand.\n");
-    testNoCommand();
-    printf(" Starting testGoodModuleArgsNoFile.\n");
-    testGoodModuleArgsNoFile();
-    printf(" Starting testInvalidModuleArgsNoFile.\n");
-    testInvalidModuleArgsNoFile();
-    printf(" Starting testValidModuleArgsInvalidFile.\n");
-    testValidModuleArgsInvalidFile();
-    printf("Config test end.\n");
+void addConfigTests() {
+    CU_pSuite pSuite = NULL;
+    pSuite = CU_add_suite("Config tests", NULL, NULL);
+    if (NULL == pSuite)
+        return;
+    CU_add_test(pSuite, "testCommandNormal", testCommandNormal);
+    CU_add_test(pSuite, "testIgnoreNonEnclosed", testIgnoreNonEnclosed);
+    CU_add_test(pSuite, "testEmpty", testEmpty);
+    CU_add_test(pSuite, "testWithEscapeChars", testWithEscapeChars);
+    CU_add_test(pSuite, "testEscapeBracket", testEscapeBracket);
+    CU_add_test(pSuite, "testMultipleOpen", testMultipleOpen);
+    CU_add_test(pSuite, "testNoClosing", testNoClosing);
+    CU_add_test(pSuite, "testEmptyBrackets", testEmptyBrackets);
+    CU_add_test(pSuite, "testNoCommand", testNoCommand);
+    CU_add_test(pSuite, "testGoodModuleArgsNoFile", testGoodModuleArgsNoFile);
+    CU_add_test(pSuite, "testInvalidModuleArgsNoFile", testInvalidModuleArgsNoFile);
+    CU_add_test(pSuite, "testValidModuleArgsInvalidFile", testValidModuleArgsInvalidFile);
 }

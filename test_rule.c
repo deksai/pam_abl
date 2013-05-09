@@ -28,157 +28,129 @@
 static void testRuleNoAttempts() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
-    if (rule_test("*:10/1s", "user", "service", state, 10) == BLOCKED)
-        printf("   No attempts should never match.\n");
+    CU_ASSERT_EQUAL(rule_test("*:10/1s", "user", "service", state, 10), CLEAR);
     destroyAuthState(state);
 }
 
 static void testEmptyRule() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("", "user", "service", state, 5) == BLOCKED)
-        printf("   The empty rule matched.\n");
-    if (rule_test(NULL, "user", "service", state, 5) == BLOCKED)
-        printf("   The empty rule matched.\n");
+    CU_ASSERT_EQUAL(rule_test("", "user", "service", state, 5), CLEAR);
+    CU_ASSERT_EQUAL(rule_test(NULL, "user", "service", state, 5), CLEAR);
     destroyAuthState(state);
 }
 
 static void testNoMatch() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("*:6/10s", "user", "service", state, 10) == BLOCKED)
-        printf("   The rule matched.\n");
-    if (rule_test("*:10/8s", "user", "service", state, 10) == BLOCKED)
-        printf("   The rule matched.\n");
+    CU_ASSERT_EQUAL(rule_test("*:6/10s", "user", "service", state, 10), CLEAR);
+    CU_ASSERT_EQUAL(rule_test("*:10/8s", "user", "service", state, 10), CLEAR);
     destroyAuthState(state);
 }
 
 static void testMatch() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("*:5/10s", "user", "service", state, 10) == CLEAR)
-        printf("   The rule did not match.\n");
-    if (rule_test("*:3/10s", "user", "service", state, 10) == CLEAR)
-        printf("   The rule did not match.\n");
+    CU_ASSERT_EQUAL(rule_test("*:5/10s", "user", "service", state, 10), BLOCKED);
+    CU_ASSERT_EQUAL(rule_test("*:3/10s", "user", "service", state, 10), BLOCKED);
     destroyAuthState(state);
 }
 
 static void testMatchService() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("*/Service1:5/10s *:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
-        printf("   The special service rule did not match.\n");
-    if (rule_test("*/Service1:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
-        printf("   The rule matched.\n");
+    CU_ASSERT_EQUAL(rule_test("*/Service1:5/10s *:10/1h", "MyUser", "Service1", state, 10), BLOCKED);
+    CU_ASSERT_EQUAL(rule_test("*/Service1:10/1h", "MyUser", "Service1", state, 10), CLEAR);
     destroyAuthState(state);
 }
 
 static void testNoService() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("*/Service1:5/10s *:8/1h", "MyUser", NULL, state, 10) == BLOCKED)
-        printf("   The rule matched.\n");
-    if (rule_test("*:5/1h", "MyUser", NULL, state, 10) == CLEAR)
-        printf("   The rule dit not match.\n");
+    CU_ASSERT_EQUAL(rule_test("*/Service1:5/10s *:8/1h", "MyUser", NULL, state, 10), CLEAR);
+    CU_ASSERT_EQUAL(rule_test("*:5/1h", "MyUser", NULL, state, 10), BLOCKED);
     destroyAuthState(state);
 }
 
 static void testMatchUser() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("MyUser:5/10s *:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
-        printf("   The rule did not match.\n");
-    if (rule_test("user2:1/1h *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
-        printf("   The rule did match.\n");
+    CU_ASSERT_EQUAL(rule_test("MyUser:5/10s *:10/1h", "MyUser", "Service1", state, 10), BLOCKED);
+    CU_ASSERT_EQUAL(rule_test("user2:1/1h *:10/1h", "MyUser", "Service1", state, 10), CLEAR);
     destroyAuthState(state);
 }
 
 static void testInvert() {
     AuthState *state = NULL;
     if (createEmptyState(CLEAR, &state)) {
-        printf("   Could not create an empty state.\n");
+        CU_FAIL("Could not create an empty state.");
         return;
     }
     size_t i = 0;
     for (; i < 5; ++i) {
-        if (addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0))
-            printf("   Could not add an attempt.\n");
+        CU_ASSERT_FALSE(addAttempt(state, USER_BLOCKED, i*2, "MyUser", "Service1", 0, 0));
     }
-    if (rule_test("!MyUser:1/10s *:10/1h", "MyUser", "Service1", state, 10) == BLOCKED)
-        printf("   The rule did match.\n");
-    if (rule_test("MyUser:1/10s !MyUser:10/1h", "MyUser", "Service1", state, 10) == CLEAR)
-        printf("   The rule did not match.\n");
+    CU_ASSERT_EQUAL(rule_test("!MyUser:1/10s *:10/1h", "MyUser", "Service1", state, 10), CLEAR);
+    CU_ASSERT_EQUAL(rule_test("MyUser:1/10s !MyUser:10/1h", "MyUser", "Service1", state, 10), BLOCKED);
     destroyAuthState(state);
 }
 
-void runRuleTests() {
-    printf("Rule test start.\n");
-    printf(" Starting testRuleNoAttempts.\n");
-    testRuleNoAttempts();
-    printf(" Starting testEmptyRule.\n");
-    testEmptyRule();
-    printf(" Starting testNoMatch.\n");
-    testNoMatch();
-    printf(" Starting testMatch.\n");
-    testMatch();
-    printf(" Starting testMatchService.\n");
-    testMatchService();
-    printf(" Starting testMatchUser.\n");
-    testMatchUser();
-    printf(" Starting testInvert.\n");
-    testInvert();
-    printf(" Starting testNoService.\n");
-    testNoService();
-    printf("Rule test end.\n");
+void addRuleTests() {
+    CU_pSuite pSuite = NULL;
+    pSuite = CU_add_suite("RuleTest", NULL, NULL);
+    if (NULL == pSuite)
+        return;
+    CU_add_test(pSuite, "testRuleNoAttempts", testRuleNoAttempts);
+    CU_add_test(pSuite, "testEmptyRule", testEmptyRule);
+    CU_add_test(pSuite, "testNoMatch", testNoMatch);
+    CU_add_test(pSuite, "testMatch", testMatch);
+    CU_add_test(pSuite, "testMatchService", testMatchService);
+    CU_add_test(pSuite, "testMatchUser", testMatchUser);
+    CU_add_test(pSuite, "testInvert", testInvert);
+    CU_add_test(pSuite, "testNoService", testNoService);
 }

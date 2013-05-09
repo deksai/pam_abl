@@ -55,6 +55,14 @@ if(USE_KC)
 	find_package(KyotoCabinet)
 endif(USE_KC)
 
+# Building without the tests
+# If you don't want to build the test executable you can add the following argument
+# -DBUILD_TESTS=FALSE
+option (BUILD_TESTS "Create the test executable" ON)
+if(BUILD_TESTS)
+	find_package(CUnit)
+endif(BUILD_TESTS)
+
 find_package(Pam REQUIRED)
 
 #we at least need BerkeleyDB or KyotoCabinet
@@ -118,9 +126,12 @@ set_target_properties(pam_abl_bin PROPERTIES OUTPUT_NAME pam_abl)
 set_target_properties(pam_abl_bin PROPERTIES COMPILE_DEFINITIONS "TOOLS")
 target_link_libraries(pam_abl_bin ${CMAKE_DL_LIBS})
 
-add_executable(pam_abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
-set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
-target_link_libraries(pam_abl_test ${CMAKE_DL_LIBS})
+if(CUnit_FOUND)
+	include_directories(${CUnit_INCLUDE_DIR})
+	add_executable(pam_abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
+	set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
+	target_link_libraries(pam_abl_test ${CMAKE_DL_LIBS} ${CUnit_LIBRARY})
+endif(CUnit_FOUND)
 
 add_library(pam_abl_lib SHARED ${PAM_ABL_COMMON_SRC} ${PAM_ABL_LIB_SRC})
 set_target_properties(pam_abl_lib PROPERTIES OUTPUT_NAME pam_abl)
