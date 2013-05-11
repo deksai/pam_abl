@@ -484,17 +484,21 @@ static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
         return 1;
 
     int         err       = 0;
+    int stateChanged      = 0;
+    BlockState updatedState = CLEAR;
     const char *object    = info->user;
     const char *data      = info->host;
     const char *service   = info->service;
     const char *whitelist = args->user_whitelist;
     long purgeTimeout     = args->user_purge;
+    const char *rule      = args->user_rule;
 
     if (type & HOST) {
         object = info->host;
         data = info->user;
         purgeTimeout = args->host_purge;
         whitelist = args->host_whitelist;
+        rule = args->host_rule;
     }
     if (!object || !*object)
         return 0;
@@ -531,6 +535,15 @@ static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
         if (addAttempt(objectState, info->blockReason, tm, data, service, args->lowerlimit, args->upperlimit)) {
             log_error( "adding an attempt.");
         } else {
+            //now determine if the subjects state has changed
+            updatedState = rule_test( rule, object, service, objectState, tm);
+            if (updatedState != getState(objectState)) {
+                if (setState(objectState, updatedState)) {
+                    log_error( "The state could not be updated.");
+                } else {
+                    stateChanged = 1;
+                }
+            }
             err = db->put(db, object, objectState, type);
         }
         destroyAuthState(objectState);
@@ -539,6 +552,13 @@ static int record_object(const abl_db *db, abl_info *info, ablObjectType type) {
         db->abort_transaction(db);
     else
         db->commit_transaction(db);
+    //only run the custom command if we have no error
+    if (!err && stateChanged) {
+        if (type & HOST)
+            runHostCommand(updatedState, info);
+        else
+            runUserCommand(updatedState, info);
+    }
     return err;
 }
 

@@ -31,6 +31,13 @@
 static const char *exePath = NULL;
 static const char *dbModule = NULL;
 
+static void emptyConfig() {
+    if (args)
+        config_free();
+    config_create();
+    args->db_module = dbModule;
+}
+
 static int setupTestEnvironment(abl_db **_abldb) {
     removeDir(TEST_DIR);
     makeDir(TEST_DIR);
@@ -329,8 +336,14 @@ static void testRecordAttemptWithAction(ModuleAction subject) {
     char serviceBuffer[100];
     time_t currentTime = time(NULL);
 
+    //let's clean the config
+    emptyConfig();
+    //make sure we don't purge
     args->host_purge = 60*60*24; //1 day
     args->user_purge = 60*60*24; //1 day
+    //make sure we're not blocked
+    args->user_rule = "*:1000/1h";
+    args->host_rule = "*:1000/1h";
 
     abl_info info;
     memset(&info, 0, sizeof(abl_info));
@@ -372,6 +385,7 @@ static void testRecordAttemptWithAction(ModuleAction subject) {
         CU_ASSERT_FALSE(abldb->get(abldb, &hostBuffer[0], &hostState, HOST));
         if (subject & ACTION_LOG_USER) {
             if (userState) {
+                CU_ASSERT_EQUAL(getState(userState), CLEAR);
                 if (getNofAttempts(userState) != 5) {
                     CU_FAIL("We expected to find five attempts.");
                 } else {
@@ -416,8 +430,9 @@ static void testRecordAttemptWithAction(ModuleAction subject) {
 
     abldb->commit_transaction(abldb);
 
-    removeDir(TEST_DIR);
     abldb->close(abldb);
+    removeDir(TEST_DIR);
+    emptyConfig();
 }
 
 static void testRecordAttempt() {
@@ -430,6 +445,175 @@ static void testRecordAttemptOnlyHost() {
 
 static void testRecordAttemptOnlyUser() {
     testRecordAttemptWithAction(ACTION_LOG_USER);
+}
+
+static void testRecordAttemptWithActionUpdatedStateBlocked(ModuleAction subject) {
+    removeDir(TEST_DIR);
+    char userBuffer[100];
+    char hostBuffer[100];
+    char serviceBuffer[100];
+
+    //let's clean the config
+    emptyConfig();
+    //make sure we don't purge
+    args->host_purge = 60*60*24; //1 day
+    args->user_purge = 60*60*24; //1 day
+    //make sure we can get blocked
+    args->user_rule = "*:3/1d";
+    args->host_rule = "*:5/1d";
+
+    abl_info info;
+    memset(&info, 0, sizeof(abl_info));
+    info.blockReason = AUTH_FAILED;
+    info.user = &userBuffer[0];
+    info.host = &hostBuffer[0];
+    info.service = &serviceBuffer[0];
+
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
+        CU_FAIL("Could not create our test environment.");
+        return;
+    }
+
+    int x = 1;
+    int y = 1;
+    for (x = 1; x < 10; ++x) {
+        for (y = 1; y < 10; ++y) {
+            snprintf(&userBuffer[0], 100, "user_%d", y);
+            snprintf(&hostBuffer[0], 100, "host_%d", y);
+            snprintf(&serviceBuffer[0], 100, "service_%d", y);
+            CU_ASSERT_FALSE(record_attempt(abldb, &info, subject));
+
+            //now check the state
+            AuthState *userState = NULL;
+            AuthState *hostState = NULL;
+            int err = abldb->start_transaction(abldb);
+            if (err) {
+                CU_FAIL("Starting transaction failed.");
+                return;
+            }
+            CU_ASSERT_FALSE(abldb->get(abldb, &userBuffer[0], &userState, USER));
+            CU_ASSERT_FALSE(abldb->get(abldb, &hostBuffer[0], &hostState, HOST));
+            if (subject & ACTION_LOG_USER) {
+                if (userState) {
+                    //at the third attempt, the state will change
+                    BlockState expected = (x >= 3 ? BLOCKED : CLEAR);
+                    if (getState(userState) != expected) {
+                        x++;
+                        --x;
+                    }
+                    CU_ASSERT(getState(userState) == expected);
+                    destroyAuthState(userState);
+                } else {
+                    CU_FAIL("Unable to retreive the user state.");
+                }
+            } else {
+                CU_ASSERT_PTR_NULL(userState);
+            }
+            if (subject & ACTION_LOG_HOST) {
+                if (hostState) {
+                    CU_ASSERT(getState(hostState) == (x >= 5 ? BLOCKED : CLEAR));
+                    destroyAuthState(hostState);
+                } else {
+                    CU_FAIL("Unable to retreive the host state.");
+                }
+            } else {
+                CU_ASSERT_PTR_NULL(hostState);
+            }
+            abldb->commit_transaction(abldb);
+        }
+    }
+
+    abldb->close(abldb);
+    removeDir(TEST_DIR);
+    emptyConfig();
+}
+
+static void testRecordAttemptWithActionUpdatedStateClear(ModuleAction subject) {
+    removeDir(TEST_DIR);
+    const char *user = "user";
+    const char *host = "host";
+    const char *service = "service";
+
+    //let's clean the config
+    emptyConfig();
+    //make sure we don't purge
+    args->host_purge = 60*60*24; //1 day
+    args->user_purge = 60*60*24; //1 day
+    //make sure we can get blocked
+    args->user_rule = "*:3/1h";
+    args->host_rule = "*:5/1h";
+
+    abl_info info;
+    memset(&info, 0, sizeof(abl_info));
+    info.blockReason = AUTH_FAILED;
+    info.user = user;
+    info.host = host;
+    info.service = service;
+
+    abl_db *abldb = NULL;
+    if (setupTestEnvironment(&abldb) || !abldb) {
+        CU_FAIL("Could not create our test environment.");
+        return;
+    }
+
+    AuthState *userState = NULL;
+    AuthState *hostState = NULL;
+    CU_ASSERT_FALSE(createEmptyState(BLOCKED, &userState));
+    CU_ASSERT_FALSE(createEmptyState(BLOCKED, &hostState));
+
+    time_t now = time(NULL);
+    int x = 0;
+    for (x = 0; x < 10; ++x) {
+        //add some failed attempts in the past, evaluating the rule now should result in a CLEAR
+        CU_ASSERT_FALSE(addAttempt(userState, AUTH_FAILED, now - (2*3600), user, service, 0, 0));
+        CU_ASSERT_FALSE(addAttempt(userState, AUTH_FAILED, now - (2*3600), user, service, 0, 0));
+    }
+    //save the states
+    CU_ASSERT_FALSE(abldb->start_transaction(abldb));
+    CU_ASSERT_FALSE(abldb->put(abldb, user, userState, USER));
+    CU_ASSERT_FALSE(abldb->put(abldb, host, hostState, HOST));
+    CU_ASSERT_FALSE(abldb->commit_transaction(abldb));
+
+    destroyAuthState(userState);
+    destroyAuthState(hostState);
+    userState = NULL;
+    hostState = NULL;
+
+    //now do a record_attempt
+    CU_ASSERT_FALSE(record_attempt(abldb, &info, subject));
+
+    //now check the state
+    CU_ASSERT_FALSE(abldb->start_transaction(abldb));
+    CU_ASSERT_FALSE(abldb->get(abldb, user, &userState, USER));
+    CU_ASSERT_FALSE(abldb->get(abldb, host, &hostState, HOST));
+    if (userState) {
+        BlockState expected = (subject & ACTION_LOG_USER ? CLEAR : BLOCKED);
+        CU_ASSERT_EQUAL(getState(userState),expected);
+    } else {
+        CU_FAIL("Unable to get the saved user.");
+    }
+    if (hostState) {
+        BlockState expected = (subject & ACTION_LOG_HOST ? CLEAR : BLOCKED);
+        CU_ASSERT_EQUAL(getState(hostState),expected);
+    } else {
+        CU_FAIL("Unable to get the saved host.");
+    }
+    abldb->commit_transaction(abldb);
+
+    abldb->close(abldb);
+    removeDir(TEST_DIR);
+    emptyConfig();
+}
+
+static void testRecordAttemptUpdatedState() {
+    testRecordAttemptWithActionUpdatedStateBlocked(ACTION_LOG_USER | ACTION_LOG_HOST);
+    testRecordAttemptWithActionUpdatedStateBlocked(ACTION_LOG_USER);
+    testRecordAttemptWithActionUpdatedStateBlocked(ACTION_LOG_HOST);
+
+    testRecordAttemptWithActionUpdatedStateClear(ACTION_LOG_USER | ACTION_LOG_HOST);
+    testRecordAttemptWithActionUpdatedStateClear(ACTION_LOG_USER);
+    testRecordAttemptWithActionUpdatedStateClear(ACTION_LOG_HOST);
 }
 
 static void testRecordAttemptWhitelistHost() {
@@ -832,10 +1016,7 @@ static void testSubstituteWithPercent() {
 }
 
 static int ablTestInit() {
-    if (args)
-        config_free();
-    config_create();
-    args->db_module = dbModule;
+    emptyConfig();
     return 0;
 }
 
@@ -861,6 +1042,7 @@ void addAblTests(const char *module) {
     CU_add_test(pSuite, "testRecordAttempt", testRecordAttempt);
     CU_add_test(pSuite, "testRecordAttemptOnlyHost", testRecordAttemptOnlyHost);
     CU_add_test(pSuite, "testRecordAttemptOnlyUser", testRecordAttemptOnlyUser);
+    CU_add_test(pSuite, "testRecordAttemptUpdatedState", testRecordAttemptUpdatedState);
     CU_add_test(pSuite, "testRecordAttemptWhitelistHost", testRecordAttemptWhitelistHost);
     CU_add_test(pSuite, "testRecordAttemptPurge", testRecordAttemptPurge);
     CU_add_test(pSuite, "testParseIpValid", testParseIpValid);
