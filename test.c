@@ -33,16 +33,40 @@
 
 void removeDir(const char *dirname) {
     DIR *dir;
+    size_t dirNameSize = strlen(dirname);
     struct dirent *entry;
-    char path[PATH_MAX];
-
     dir = opendir(dirname);
     if (dir == NULL)
         return;
 
+    //According to POSIX.1-2001 a buffer of size PATH_MAX suffices,
+    //but PATH_MAX need not be a defined constant
+    //Asking pathconf(3) does not really help, since, on the one hand
+    //POSIX warns that the result of pathconf(3) may be huge and unsuitable
+    //for mallocing memory, and on the other hand pathconf(3) may return -1
+    //to signify that PATH_MAX is not bounded.
+    //as a last resort, just alloc some memory
+    size_t pathSize = 512;
+    char *path = malloc(sizeof(char)*pathSize);
+    if (path == NULL) {
+        closedir(dir);
+        return;
+    }
+
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..")) {
-            snprintf(path, (size_t) PATH_MAX, "%s/%s", dirname, entry->d_name);
+            // + 2, the '/' and a \0 char
+            size_t neededSize = dirNameSize + strlen(entry->d_name) + 2;
+            if (neededSize > pathSize) {
+                //allocate a little more, it will hopefullly catch future reallocs
+                pathSize = neededSize + 512;
+                path = realloc(path, pathSize);
+                if (path == NULL) {
+                    closedir(dir);
+                    return;
+                }
+            }
+            snprintf(path, pathSize, "%s/%s", dirname, entry->d_name);
             if (entry->d_type == DT_DIR) {
                 removeDir(path);
             } else {
@@ -52,6 +76,7 @@ void removeDir(const char *dirname) {
     }
     closedir(dir);
     rmdir(dirname);
+    free(path);
     return;
 }
 
