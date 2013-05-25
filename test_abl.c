@@ -599,6 +599,9 @@ static void testRecordAttemptWithActionUpdatedStateClear(ModuleAction subject) {
     } else {
         CU_FAIL("Unable to get the saved host.");
     }
+    destroyAuthState(userState);
+    destroyAuthState(hostState);
+
     abldb->commit_transaction(abldb);
 
     abldb->close(abldb);
