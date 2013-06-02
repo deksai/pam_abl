@@ -446,7 +446,8 @@ static int doupdate(abl_db *abldb, ablObjectType type) {
                     goto doupdate_fail;
                 }
                 abl_info info;
-                info.blockReason = CLEAR;
+                //the blockReason is not used, so can be any value here
+                info.blockReason = AUTH_FAILED;
                 info.user = NULL;
                 info.host = NULL;
                 info.service = NULL;

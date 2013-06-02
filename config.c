@@ -87,7 +87,7 @@ static void config_clear() {
 void config_create() {
     args = malloc(sizeof(abl_args));
     if (args)
-        config_clear(args);
+        config_clear();
 }
 
 static int parse_arg(const char *arg) {
