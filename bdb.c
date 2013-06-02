@@ -371,10 +371,10 @@ int bdb_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsi
     bdb_state *db = abldb->state;
     err = db->m_cursor->c_get(db->m_cursor, &m_key, &m_data, DB_NEXT);
     if (DB_NOTFOUND == err) {
-        return 1;
+        return DB_CURSOR_END;
     }else if (err) {
         log_db_error(err, "Iterating cursor");
-        return err;
+        return 2;
     }
     *key    = m_key.data;
     *ksize  = m_key.size;
@@ -394,6 +394,8 @@ int bdb_c_close(abl_db *abldb) {
 #endif
 
         if (err) log_db_error(err, "Closing cursor");
+    } else {
+        log_info("closing already closed cursor.");
     }
     return err;
 }

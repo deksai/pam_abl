@@ -273,8 +273,8 @@ static int doshow(abl_db *db, ablObjectType type) {
 
     /* Cleanup */
 doshow_fail:
-    db->commit_transaction(db);
     db->c_close(db);
+    db->commit_transaction(db);
     free(buf);
     return err;
 }
@@ -310,8 +310,11 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
 
     for (;;) {
         err = abldb->c_get(abldb, &key, &ksize, &data, &dsize);
-        if (err) 
+        if (err) {
+            if (err == DB_CURSOR_END)
+                err = 0;
             break;
+        }
 
         AuthState *authstate = NULL;
         err = createAuthState(data, dsize, &authstate);
@@ -366,11 +369,11 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
     // Cleanup
 dopurge_fail:
     free(buf);
+    abldb->c_close(abldb);
     if (err)
         abldb->abort_transaction(abldb);
     else
         abldb->commit_transaction(abldb);
-    abldb->c_close(abldb);
     return err;
 }
 
@@ -406,8 +409,11 @@ static int doupdate(abl_db *abldb, ablObjectType type) {
 
     for (;;) {
         err = abldb->c_get(abldb, &key, &ksize, &data, &dsize);
-        if (err) 
+        if (err) {
+            if (err == DB_CURSOR_END)
+                err = 0;
             break;
+        }
 
         AuthState *authstate = NULL;
         err = createAuthState(data, dsize, &authstate);
@@ -459,11 +465,11 @@ static int doupdate(abl_db *abldb, ablObjectType type) {
     // Cleanup
 doupdate_fail:
     free(buf);
+    abldb->c_close(abldb);
     if (err)
         abldb->abort_transaction(abldb);
     else
         abldb->commit_transaction(abldb);
-    abldb->c_close(abldb);
     return err;
 }
 
@@ -493,6 +499,8 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
     for (;;) {
         err = abldb->c_get(abldb, &key, &ksize, &data, &dsize);
         if (err) {
+            if (err == DB_CURSOR_END)
+                err = 0;
             break;
         } 
 
@@ -557,11 +565,11 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
 
 whitelist_fail:
     free(buf);
+    abldb->c_close(abldb);
     if (err)
         abldb->abort_transaction(abldb);
     else 
         abldb->commit_transaction(abldb);
-    abldb->c_close(abldb);
     return err;
 }
 

@@ -210,9 +210,10 @@ int kc_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsiz
     err = kccurecode(db->cursor);
     if (NULL == *key || NULL == *data) {
         if (err != 7) {
-            log_db_error(kccurecode(db->cursor), "Iterating cursor: %s");
+            log_db_error(kccurecode(db->cursor), "Iterating cursor");
+            return 2;
         }
-        return 1;
+        return DB_CURSOR_END;
     }
     _key = *key;
     _data = *data;
@@ -223,6 +224,8 @@ int kc_c_close(abl_db *abldb) {
     kc_state *db = abldb->state;
     if (db->cursor) {
         kccurdel(db->cursor);
+    } else {
+        log_info("closing already closed cursor.");
     }
     return 0;
 }

@@ -20,6 +20,8 @@
 #define PAM_DBFUN_H
 #include "typefun.h"
 
+#define DB_CURSOR_END 1
+
 typedef struct abl_db _abl_db;
 typedef struct abl_db {
     void (*close)(_abl_db *db);
@@ -30,6 +32,7 @@ typedef struct abl_db {
     int (*c_close)(_abl_db *);
     int (*c_get)(_abl_db *,char **key,size_t *ksize,char **data,size_t *dsize);
     int (*start_transaction)(const _abl_db *);
+    //make sure all cursors are closed before calling commit or abort
     int (*commit_transaction)(const _abl_db *);
     int (*abort_transaction)(const _abl_db *);
     void *state;

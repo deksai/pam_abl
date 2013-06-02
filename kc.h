@@ -94,7 +94,7 @@ int kc_c_close(abl_db *abldb);
   \param int* This will be set to the size of the retrieved key.
   \param char** The binary data belonging to the above key.
   \param int* This will be set to the size of the above data.
-  \return zero on success, non zero otherwise
+  \return zero on success, DB_CURSOR_END if no more records, other value otherwise
 */
 int kc_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize);
 

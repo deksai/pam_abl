@@ -122,7 +122,7 @@ int bdb_c_close(abl_db *abldb);
   \param int* This will be set to the size of the retrieved key.
   \param char** The binary data belonging to the above key.
   \param int* This will be set to the size of the above data.
-  \return zero on success, non zero otherwise
+  \return zero on success, DB_CURSOR_END if no more records, other value otherwise
 */
 int bdb_c_get(abl_db *abldb, char **key, size_t *ksize, char **data, size_t *dsize);
 
@@ -135,6 +135,7 @@ int bdb_start_transaction(const abl_db *db);
 
 /*
   End a transaction started on the environment applying all the changes
+  Make sure all cursors are closed before calling this function
   \return zero on success, otherwise non zero
   \note calling this function on an environment with no transaction started sill succeed
 */
@@ -142,6 +143,7 @@ int bdb_commit_transaction(const abl_db *db);
 
 /*
   End a transaction started on the environment discarding all the changes
+  Make sure all cursors are closed before calling this function
   \return zero on success, otherwise non zero
   \note calling this function on an environment with no transaction started sill succeed
 */
