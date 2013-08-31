@@ -2,7 +2,6 @@ PAM_ABL(1)
 =========
 :man source: GNU
 :man manual: User Commands
-:author: Chris Tasma
 
 NAME
 ----
@@ -17,7 +16,7 @@ pam_abl [OPTION] [CONFIG]
 DESCRIPTION
 -----------
 
-Provides a non-pam interface to the infomration stored in the pam_abl module
+Provides a non-pam interface to the information stored in the pam_abl module
 databases.  CONFIG is the name of the pam_abl config file (default:
 /etc/security/pam_abl.conf). The config file is read to discover the names of
 the pam_abl databases, the rules that control purging of old data from them and

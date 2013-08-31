@@ -2,7 +2,6 @@ PAM_ABL.CONF(5)
 ==============
 :man source: GNU
 :man manual: Linux-PAM Manual
-:author: Chris Tasma
 
 NAME
 ----
@@ -54,7 +53,7 @@ a set of triggers. A simple example would be
 *:10/1h
 -------
 
-which means 'block any user (*) if they are responsible for ten or
+which means 'block any user (\*) if they are responsible for ten or
 more failed authentication attempts in the last hour'. In place of
 the '*' which matches any user a list of usernames can be supplied
 like this
@@ -201,9 +200,9 @@ allowed access, but was blocked during the previous attempt.  Obviously this
 will not work if you previously blocked them with iptables, since they will
 never be able to trigger this command.  In this case, you can't rely on pam_abl
 to unblock them.  One possibility would be to use special firewall chains which
-can be cleared automatically with a script and a cron job.+  host_block_cmd and
-user_block_cmd are run if the current attempt causes a previously allowed host
-or user to be blocked. +
+can be cleared automatically with a script and a cron job. +
+host_block_cmd and user_block_cmd are run if the current attempt causes a
+previously allowed host or user to be blocked. +
 Within the commands, you can specify substitutions with %h, %u and %s, which
 will be replaced with the host name, user name and service currently being
 checked. For security reasons we do not run the command using the system call.
@@ -251,6 +250,6 @@ AUTHORS
 
 Lode Mertens <pam-abl@danta.be>
 
-Andy Armstrong <andy@hexten.net> +
+Andy Armstrong <andy@hexten.net>
 
 Chris Tasma <pam-abl@deksai.com>

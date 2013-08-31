@@ -2,7 +2,6 @@ PAM_ABL(8)
 =========
 :man source: GNU
 :man manual: Linux-PAM Manual
-:author: Chris Tasma
 
 NAME
 ----
@@ -128,7 +127,7 @@ The rule (see below for format) which defines the conditions under which a
 failed users will be blackisted.
 
 |user_whitelist|Users that do not need to be tracked.|
-A semi-colon seperated list of users whose attempts do not need to be recorded.
+A semi-colon separated list of users whose attempts do not need to be recorded.
 This does not prevent the machine they are using from being blocked.
 
 |user_blk_cmd|User block command |
