@@ -107,7 +107,7 @@ in the root account being locked out even for valid holders of
 root credentials.
 The config file can contain any arguments that would be supplied
 via PAM config. In the config file arguments are placed on
-separate lines. Comments may be included after a '#' and line
+separate lines. Comments may be included after a '#', and line
 continuation is possible by placing a back slash at the end of the
 line to be continued. Here is a sample /etc/security/pam_abl.conf:
 
@@ -130,23 +130,28 @@ The arguments that are specific to the PAM module are as follows:
 
 *db_home*::
 Specify the directory where the Berkeley db
-can store it's lock and log files. Make sure
-this dir exists and is writable.
+can store its lock and log files. Make sure
+this directory exists and is writable.
 
 *limits*::
-It's value should have the following syntax "<minimum>-<maximum>".
-If you do not block machines that do too many attempts, the db can 
-easily become bloated. To prevent this we introduced this setting. 
-As soon as there are a <maximum> number of attempts for a user/host, 
-the number of stored attempts for this user/host is reduced to <minimum>. 
-A <maximum> of 0 means no limits. Make sure that <minimum> is larger 
-then any rule specified. We recommend a value of "1000-1200".
+Its value should have the following syntax
+"<minimum>-<maximum>".  If you do not block
+hosts (with iptables for example) that do too
+many attempts, the db can easily become
+bloated. To prevent this we introduced this
+setting.  As soon as there are a <maximum>
+number of attempts for a user/host, the number
+of stored attempts for this user/host is
+reduced to <minimum>.  A <maximum> of 0 means
+no limits. Make sure that <minimum> is larger
+than any rule specified. We recommend a value
+of "1000-1200".
 
 *host_db, user_db*::
 Specify the name of the databases that will   
 be used to log failed authentication          
 attempts. The host database is used to log    
-the hostname responsible for a failed auth    
+the hostname responsible for a failed auth,    
 and the user database is used to log the      
 requested username. If host_db or user_db is  
 omitted the corresponding auto blacklisting   
@@ -170,11 +175,11 @@ Note that in normal operation pam_abl will
 only purge the logged data for a particular   
 host or user if it happens to be updating it, 
 i.e. if that host or user makes another       
-failed attempt. To purge all old entries the  
+failed attempt. To purge all old entries, the  
 pam_abl command line tool should be used.     
 
 *host_rule, user_rule*::
-These are the rules which determine the       
+These are the rules used to determine the       
 circumstances under which accounts are        
 auto-blacklisted. The host_rule is used to    
 block access to hosts that are responsible    
@@ -192,10 +197,15 @@ host_clear_cmd, host_block_cmd, user_clear_cmd, user_block_cmd
 These specify commands that will run during a check when an item switches
 state since its last check. +
 host_clear_cmd and user_clear_cmd will run if the host or user is currently
-allowed access. host_block_cmd and user_block_cmd are run if the host or user
-is currently being blocked by their respective rules. +
+allowed access, but was blocked during the previous attempt.  Obviously this
+will not work if you previously blocked them with iptables, since they will
+never be able to trigger this command.  In this case, you can't rely on pam_abl
+to unblock them.  One possibility would be to use special firewall chains which
+can be cleared automatically with a script and a cron job.+  host_block_cmd and
+user_block_cmd are run if the current attempt causes a previously allowed host
+or user to be blocked. +
 Within the commands, you can specify substitutions with %h, %u and %s, which
-will be replace with the host name, user name and service currently being
+will be replaced with the host name, user name and service currently being
 checked. For security reasons we do not run the command using the system call.
 We use the more secure fork/exec solution. This means that you can't specify
 input and output redirections. +
@@ -203,13 +213,13 @@ Note that this also means that no escaping is done, so if you call a shell
 here, you might introduce a security problem. +
 The commands should follow a special syntax (you can use the command line tool
 with the -d option to test the parsing of your commands) where the command and
-it's different arguments need to be enclosed in [] and all text not enclosed
+its different arguments need to be enclosed in [] and all text not enclosed
 in [] is simply ignored. For example: "[/usr/bin/logger] ignored [block]
 [user] [%u]" will run the command "/usr/bin/logger block user <current user>".
 If you want to specify a '[', ']' or '\', you need to escape them with a '\'.
 
 *host_whitelist, user_whitelist*::
-;-seperated list of hosts/users whose attempts will not be recorded. 
+A semi-colon separated list of hosts or users whose attempts will not be recorded. 
 So if an attempt is made from "10.10.10.10" for user "root" and "root" 
 is in the whitelist, only an attempt for his machine is recorded.
 If a user is whitelisted, this does not prevent his machine from being blocked.

@@ -12,9 +12,9 @@ pam_abl - PAM Auto Blacklist Module
 SYNOPSIS
 --------
 
-Provides auto blacklisting of hosts and users responsible for repeated
-failed authentication attempts. Generally configured so that blacklisted
-users still see normal login prompts but are guaranteed to fail to
+Provides auto blacklisting of hosts and users responsible for repeatedly
+failed authentication attempts. It is generally configured so that blacklisted
+users still see normal login prompts, but are guaranteed to fail to
 authenticate.
 
 This functionality is only available to services which call PAM as root.
@@ -25,11 +25,11 @@ DESCRIPTION
 
 Brute force password discovery attacks involve repeated attempts to
 authenticate against a service using a dictionary of common passwords. While it
-is desirable to enforce strong passwords for users this is not always possible
-and in cases where a weak password has been used brute force attacks can be
+is desirable to enforce strong passwords for users, this is not always possible.
+In cases where a weak password has been used, brute force attacks can be
 effective.
 
-The pam_abl module monitors failed authentication attempts and automatically
+The pam_abl module monitors failed authentication attempts, and automatically
 blacklists those hosts (and accounts) that are responsible for large numbers of
 failed attempts. Once a host is blacklisted it is guaranteed to fail
 authentication even if the correct credentials are provided.
@@ -68,11 +68,13 @@ Ignored
 The configuration file contains additional arguments. In order for the pam_abl command line tool to work correctly most of the configuration should be placed in the config file rather than being provided by arguments. The format of the config file is described below.
 
 |limits|Minimum and maximum number of attempts to keep.|
-It's value should have the following syntax "<minimum>-<maximum>".
-If you do not block machines that do too many attempts, the db can easily become bloated.
-To prevent this we introduced this setting. As soon as there are a <maximum> number of attempts
-for a user/host, the number of stored attempts is reduced to <minimum>. A <maximum> of 0 means no limits.
-Make sure that <minimum> is larger then any rule specified. We recommend a value of "1000-1200".
+It's value should have the following syntax "<minimum>-<maximum>".  If you do
+not block hosts (with iptables for example) that do too many attempts, the db
+can easily become bloated.  To prevent this we introduced this setting. As soon
+as there are a <maximum> number of attempts for a user/host, the number of
+stored attempts is reduced to <minimum>. A <maximum> of 0 means no limits.
+Make sure that <minimum> is larger then any rule specified. We recommend a
+value of "1000-1200".
 
 |db_home|Directory for db locking and logging files.|
 Path to a directory where Berkeley DB can place it's locking and logging files.
@@ -91,7 +93,7 @@ The rule (see below for format) which defines the conditions under which a
 failed hosts will be blackisted.
 
 |host_whitelist|Host that do not need to be tracked.|
-;-seperated list of host that do not need to be tracked. 
+A semi-colon seperated list of host that do not need to be tracked. 
 You can specify single IP addresses here or use subnets.
 For example 1.1.1.1 or 1.1.1.1/24
 
@@ -102,13 +104,13 @@ Deprecated for security reasons. Please use host_block_cmd
 Deprecated for security reasons. Please use host_clear_cmd
 
 |host_block_cmd|Host block command |
-Command that should be run when a host is checked, and is currently blocked.
+Command that should be run when a host is checked, and has switched to a blocked state.
 Within the command, the strings %u, %h and %s are substituted with username,
 host and service.  Not all need to be used. Please see the manpage of
 pam_abl.conf for the correct syntax.
 
 |host_clear_cmd|Host clear command |
-Command that should be run when a host is checked, and is currently clear.
+Command that should be run when a host is checked, and has switched to a clear state.
 Within the command, the strings %u, %h and %s are substituted with username,
 host and service.  Not all need to be used. Please see the manpage of
 pam_abl.conf for the correct syntax.
@@ -126,7 +128,7 @@ The rule (see below for format) which defines the conditions under which a
 failed users will be blackisted.
 
 |user_whitelist|Users that do not need to be tracked.|
-;-seperated list of users whose attempts do not need to be recorded.
+A semi-colon seperated list of users whose attempts do not need to be recorded.
 This does not prevent the machine they are using from being blocked.
 
 |user_blk_cmd|User block command |
@@ -136,12 +138,12 @@ Deprecated for security reasons. Please use user_block_cmd
 Deprecated for security reasons. Please use clear_block_cmd
 
 |user_blk_cmd|User block command |
-Command that should be run when a user is checked, and is currently blocked.
+Command that should be run when a user is checked, and has switched to a blocked state.
 Within the command, the strings %u, %h and %s are substituted with username,
 host and service.  Not all need to be used.
 
-|user_clr_cmd|User block command |
-Command that should be run when a user is checked, and is currently clear.
+|user_clr_cmd|User clear command |
+Command that should be run when a user is checked, and has switched to a clear state.
 Within the command, the strings %u, %h and %s are substituted with username,
 host and service.  Not all need to be used.
 
@@ -161,8 +163,8 @@ auth required   /lib/security/pam_abl.so
 auth sufficient /lib/security/pam_unix.so likeauth nullok          
 auth required   /lib/security/pam_deny.so                          
 
-Although all of accepted arguments can be supplied here they will
-usually be placed in a separate config file and linked to using
+Although all of accepted arguments can be supplied here, they will
+usually be placed in a separate config file and included using
 the config argument as in the above example. The pam_abl command
 line tool reads the external config file
 (/etc/security/pam_abl.conf in this case) to find the databases so

@@ -55,8 +55,8 @@ NON-PAM INTERACTION
         If more than one host or user is given, checks only the first host/user
         pair.
 *-u, --update*::
-	Update the state of all users/hosts in the db.
-	This will also cause the appropriate scripts to be called.
+        Update the state of all users/hosts in the db.
+        This will also cause the appropriate scripts to be called.
 *-s, --service*::
         Operate in context of specified service.  Defaults to 'none'.
 *-U, --user*::
@@ -64,16 +64,17 @@ NON-PAM INTERACTION
 *-H, --host*::
         Operate on host (wildcards are ok for whitelisting).
 *-R, --reason*::
-	Only used when -f is provided (defaults to "AUTH").
-	Specifies why the authentication failed.
-	Possible values are USER, HOST, BOTH, AUTH
+        Only used when -f is provided (defaults to "AUTH").
+        Specifies why the authentication failed.
+        Possible values are USER, HOST, BOTH, AUTH
 
 If you specified commands to run in your configuration, those commands will try
 to run if the host or user switches state (blocked <-> clear) since the last
 time it was checked.  The command will only be able to run, however, if you
-supply enough information to fill in the substitutions in the command.  For
-instance, if your host_clr_command uses the %s parameter, you will need to
-specify the service with -s in order for the command to actually run.
+supply enough information to fill in the substitutions in the command.  If
+using the command line tool for instance, and your host_clear_cmd uses the %s
+parameter, you will need to specify the service on the command line with -s in
+order for the host_clear_cmd to actually run.
 
 EXAMPLES
 --------
