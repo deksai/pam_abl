@@ -55,7 +55,7 @@ a set of triggers. A simple example would be
 
 which means 'block any user (\*) if they are responsible for ten or
 more failed authentication attempts in the last hour'. In place of
-the '*' which matches any user a list of usernames can be supplied
+the '*', which matches any user, a list of usernames can be supplied
 like this
 
 --------------------
@@ -71,7 +71,7 @@ like this
 root/sshd|dba/*:3/1d
 --------------------
 
-which means 'block the users root for service 'sshd' and dba for
+which means 'block the users root for service sshd and dba for
 any service if they are responsible for three or more failed
 authentication attempts in the last day'. Finally you can specify
 multiple triggers like this
@@ -82,7 +82,7 @@ root:10/1h,20/1d
 
 which means 'block the user root if they are responsible for ten
 or more failed attempts in the last hour or twenty or more failed
-attempts in the last day.
+attempts in the last day'.
 
 Multiple rules can be provided separated by spaces like this
 
