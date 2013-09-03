@@ -28,11 +28,14 @@
 
 typedef struct {
     BlockReason blockReason;
-    const char *user;
-    const char *host;
-    const char *service;
+    char *user;
+    char *host;
+    char *service;
 } abl_info;
 
+abl_info *createAblInfo();
+void destroyAblInfo(abl_info *info);
+abl_info *copyAblInfo(abl_info *info);
 
 /*
   Call the desired scripts if possible

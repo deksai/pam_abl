@@ -803,8 +803,8 @@ int main(int argc, char **argv) {
         }
         info.service = service;
         info.blockReason = bReason;
-        info.user = num_users > 0 ? users[0] : NULL;
-        info.host = num_hosts > 0 ? hosts[0] : NULL;
+        info.user = num_users > 0 ? (char*)users[0] : NULL;
+        info.host = num_hosts > 0 ? (char*)hosts[0] : NULL;
         fail(abldb, &info);
     } else if (command == CHECK) {
         if (num_users == 0 && num_hosts == 0) {
@@ -820,8 +820,8 @@ int main(int argc, char **argv) {
         }
 
         info.service = service;
-        info.host = num_hosts > 0 ? hosts[0] : NULL;
-        info.user = num_users > 0 ? users[0] : NULL;
+        info.host = num_hosts > 0 ? (char*)hosts[0] : NULL;
+        info.user = num_users > 0 ? (char*)users[0] : NULL;
         BlockState bState = check_attempt(abldb, &info, ACTION_CHECK_HOST | ACTION_CHECK_USER);
         if (bState == BLOCKED)
             err = 1;

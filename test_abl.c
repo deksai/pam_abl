@@ -125,9 +125,9 @@ static void checkAttemptWithSubject(abl_db *abldb, const char *user, const char 
 
     abl_info info;
     memset(&info, 0, sizeof(abl_info));
-    info.user = user;
-    info.host = host;
-    info.service = service;
+    info.user = (char*)user;
+    info.host = (char*)host;
+    info.service = (char*)service;
     BlockState newState = check_attempt(abldb, &info, subjects);
     CU_ASSERT_EQUAL(newState, expectedBlockState);
     CU_ASSERT_EQUAL(info.blockReason, bReason);
@@ -531,9 +531,9 @@ static void testRecordAttemptWithActionUpdatedStateBlocked(ModuleAction subject)
 
 static void testRecordAttemptWithActionUpdatedStateClear(ModuleAction subject) {
     removeDir(TEST_DIR);
-    const char *user = "user";
-    const char *host = "host";
-    const char *service = "service";
+    char *user = "user";
+    char *host = "host";
+    char *service = "service";
 
     //let's clean the config
     emptyConfig();
@@ -968,9 +968,9 @@ static void testWhitelistMatch() {
 
 static void testSubstitute(const char *str, const char *user, const char *host, const char *service, const char *result) {
     abl_info info;
-    info.user = user;
-    info.host = host;
-    info.service = service;
+    info.user = (char*)user;
+    info.host = (char*)host;
+    info.service = (char*)service;
 
     int resultSize = prepare_string(str, &info, NULL);
     if (resultSize != (int)(strlen(result)+1)) {

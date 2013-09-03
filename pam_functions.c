@@ -30,6 +30,10 @@
 
 #define MODULE_NAME "pam-abl"
 
+typedef struct abl_context {
+    abl_info     *attemptInfo;
+} abl_context;
+
 static abl_db *setup_db() {
     abl_db *abldb = NULL;
     void *dblib = NULL;
@@ -49,21 +53,61 @@ static abl_db *setup_db() {
     return abldb;
 }
 
+static void cleanup(pam_handle_t *pamh, void *data, int err) {
+    (void)(pamh);
+    //if we are replacing our data pointer, ignore the cleanup.
+    //the function replacing our data should handle the cleanup
+    if (err & PAM_DATA_REPLACE)
+        return;
+
+    if (NULL != data) {
+        abl_context *context = data;
+        abl_db *abldb = NULL;
+
+        log_debug("In cleanup, err is %08x", err);
+        abldb = setup_db();
+        if (!abldb)
+            goto cleanup_fail;
+
+        if (err) {
+            int recordResult = record_attempt(abldb, context->attemptInfo, ACTION_LOG_USER | ACTION_LOG_HOST);
+            log_debug("record returned %d", recordResult);
+        }
+
+    cleanup_fail:
+        if (abldb)
+            abldb->close(abldb);
+        destroyAblInfo(context->attemptInfo);
+        if (args)
+            config_free();
+        free(context);
+    }
+}
+
 /* Authentication management functions */
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
     (void)(flags);
     int err = PAM_BUF_ERR;
-    abl_info *attemptInfo = NULL;
+    abl_info attemptInfo;
+    memset(&attemptInfo, 0, sizeof(abl_info));
     abl_db *abldb = NULL;
+    abl_context *context = NULL;
     ModuleAction action = ACTION_NONE;
 
-    attemptInfo = malloc(sizeof(abl_info));
+    //one of the first things we need to do is check if we have a previous context
+    //as this determines if the args struct will need to be freed or not
+    err = pam_get_data(pamh, MODULE_NAME, (const void **)(&context));
+    if (err != PAM_SUCCESS) {
+        context = NULL;
+    }
+
+    //always start with a new config structure
+    config_free();
     config_create();
-    if (!attemptInfo || !args) {
+    if (!args) {
         err = PAM_BUF_ERR;
         goto psa_fail;
     }
-    memset(attemptInfo, 0, sizeof(abl_info));
 
     err = config_parse_module_args(argc, argv, &action);
     if (err != 0) {
@@ -71,33 +115,59 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         log_error("Could not parse the config.");
         goto psa_fail;
     }
-    if (action == ACTION_NONE) {
-        err = PAM_SERVICE_ERR;
-        log_error("No action given. Aborting.");
-        goto psa_fail;
-    }
 
     abldb = setup_db();
     if (!abldb)
         goto psa_fail;
 
+    //if we have a previous context and that context has an attempt in it
+    if (context && context->attemptInfo) {
+        //we have a previous data pointer. We will ASSUME that it was from a previous failed attempt
+        //a good example is sshd, when you try to login, you are given 3 attempts, so this function
+        //can be called up to three times before the cleanup function is called.
+        int recordResult = record_attempt(abldb, context->attemptInfo, ACTION_LOG_USER | ACTION_LOG_HOST);
+        log_debug("record from authenticate returned %d", recordResult);
+        //we don't need this info anymore, we will read new values
+        destroyAblInfo(context->attemptInfo);
+        context->attemptInfo = NULL;
+    }
+
     //get the user again, it can be that another module has changed the username or something else
-    err = pam_get_item(pamh, PAM_USER, (const void **) &attemptInfo->user);
+    err = pam_get_item(pamh, PAM_USER, (const void **) &attemptInfo.user);
     if (err != PAM_SUCCESS) {
         log_pam_error(pamh, err, "getting PAM_USER");
         goto psa_fail;
     }
 
-    err = pam_get_item(pamh, PAM_SERVICE, (const void **) &attemptInfo->service);
+    err = pam_get_item(pamh, PAM_SERVICE, (const void **) &attemptInfo.service);
     if (err != PAM_SUCCESS) {
         log_pam_error(pamh, err, "getting PAM_SERVICE");
         goto psa_fail;
     }
 
-    err = pam_get_item(pamh, PAM_RHOST, (const void **) &attemptInfo->host);
+    err = pam_get_item(pamh, PAM_RHOST, (const void **) &attemptInfo.host);
     if (err != PAM_SUCCESS) {
         log_pam_error(pamh, err, "getting PAM_RHOST");
         goto psa_fail;
+    }
+
+    ModuleAction checkAction = action;
+    if (action == ACTION_NONE) {
+        checkAction = ACTION_CHECK_USER | ACTION_CHECK_HOST;
+        if (!context) {
+            context = malloc(sizeof(abl_context));
+            if (!context) {
+                err = PAM_BUF_ERR;
+                goto psa_fail;
+            }
+            memset(context, 0, sizeof(abl_context));
+            err = pam_set_data(pamh, MODULE_NAME, context, cleanup);
+            if (err != PAM_SUCCESS) {
+                log_pam_error(pamh, err, "setting PAM data");
+                goto psa_fail;
+            }
+        }
+        context->attemptInfo = copyAblInfo(&attemptInfo);
     }
 
     //add the user/host attempt (if needed)
@@ -110,8 +180,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             checkSubject |= ACTION_CHECK_USER;
         if (action & ACTION_LOG_HOST)
             checkSubject |= ACTION_CHECK_HOST;
-        check_attempt(abldb, attemptInfo, checkSubject);
-        int recordResult = record_attempt(abldb, attemptInfo, action);
+        check_attempt(abldb, &attemptInfo, checkSubject);
+        int recordResult = record_attempt(abldb, &attemptInfo, action);
         log_debug("record_attempt returned %d", recordResult);
     }
 
@@ -119,10 +189,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     err = PAM_SUCCESS;
 
     //secondly check if we need to check if the user/host is blocked
-    if (action & (ACTION_CHECK_USER | ACTION_CHECK_HOST)) {
-        BlockState bState = check_attempt(abldb, attemptInfo, action);
+    if (checkAction & (ACTION_CHECK_USER | ACTION_CHECK_HOST)) {
+        BlockState bState = check_attempt(abldb, &attemptInfo, checkAction);
         if (bState == BLOCKED) {
-            log_info("Blocking access from %s to service %s, user %s", attemptInfo->host, attemptInfo->service, attemptInfo->user);
+            log_info("Blocking access from %s to service %s, user %s", attemptInfo.host, attemptInfo.service, attemptInfo.user);
             err = PAM_AUTH_ERR;
         } else {
             err = PAM_SUCCESS;
@@ -132,11 +202,16 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 psa_fail:
     if (abldb)
         abldb->close(abldb);
-    if (attemptInfo)
-        free(attemptInfo);
-    if (args)
+    if (args && !context)
         config_free();
     return err;
+}
+
+PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+    (void)(argc);
+    (void)(argv);
+    (void)(flags);
+    return pam_set_data(pamh, MODULE_NAME, NULL, cleanup);
 }
 
 /* Init structure for static modules */
@@ -144,7 +219,7 @@ psa_fail:
 struct pam_module _pam_abl_modstruct = {
     MODULE_NAME,
     pam_sm_authenticate,
-    NULL,
+    pam_sm_setcred,
     NULL,
     NULL,
     NULL,
