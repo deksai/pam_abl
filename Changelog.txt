@@ -1,0 +1,83 @@
+pam-abl is a pam module designed to automatically block hosts which are attempting a brute force attack.
+
+Building
+Pam-abl doesn't come with a normal makefile, mostly because I find them to complicated for what they need to do. That's why I decided to go with cmake.
+If you are handy with the autotools framework, feel free to write some scripts and I will be happy to include them.
+
+
+
+Changelog:
+0.6.0
+Bugfix release for the 0.5.0 release. But because there are some 
+incompatibilities between this version and 0.5.0 we increased the 
+version number.
+Incompatibilities:
+- target is named pam_abl again
+- syntax for specifying the commands to run has changed (please see the manpages for more details)
+Fixes:
+- BUG #33 test.c fails to compile on hurd-i386 (thanx to  Alex Mestiashvili for reporting this bug)
+- create a copy of the user/host/service (reported by Dan)
+- Rename targets to pam_abl (sorry for the name mixup in previous release)
+- automatically cleanup db log files
+- security fix, do not run commands using system(). Please see the manpages for more details.
+- Sourceforge bug #3564436 second authentication succeeds
+
+0.5.0
+This version is a total rewrite of the previous versions. I guess +-400 lines are unchanged (mostly dealing with parsing the config file).
+The total rewrite results in a lot more stability and some extra features (Please see the manpages in the doc directory for more details).
+- the two db tables have been merged making db locking easier
+- added a block reason, making troubleshooting easier
+- introduce limits in the db, preventing a hacker from filling up the machine
+- white listing support for users, computers and ip ranges
+- fixed the custom commands, they were a little bit buggy in previous versions
+- and a lot more
+
+0.4.3.1
+Fix a segfault when no user_rule is provided (Sourceforge bug #3556423)
+
+0.4.3
+Fix printf problem on 32bit machines, as reported by Petr Písař and antpu on
+Sourceforge bug #3472603.
+
+Fixed cursor close bug. (Sourceforge #3468220)
+	
+Fixed pointer alias problem. (Sourceforge bug #3469379)
+
+Incorporate the very helpful patches from Lode (a.k.a. danta on sourceforge)
+which add transactions to the databases to prevent corruption with
+concurrent access, change the script calling behavior and clean up some
+resources. (Sourceforge bug #3469409)
+
+0.4.2
+Streamlined database handling to reduce the number of times the databases need
+to be opened.
+Fixed a bug with host blocking.
+Added a patch from sourceforge to fix long options for the command line tool.
+Fixed some reported typos.
+Fixed automake to actually use the -Wall and -Werror options.  They were in the wrong macro before.
+Fixed compiler warnings.
+
+0.4.1
+Fixed a bad typo that caused the PAM portion to always fail people.
+Clarified some documentation, updated examples and fixed some typos.
+
+0.4.0
+***THIS VERSION IS NOT COMPATIBLE WITH YOUR OLD DATABASE FILES***
+If you get strange errors when running pam_abl about invalid arguments, you
+will need to either delete or move your old database files, and let them be
+recreated.
+
+Changed the command line interface to allow non-pam interaction.  You can now
+fail, whitelist (unblock), and check hosts and users from the command line.
+
+Added the ability to run commands with parameter substitution when a host or
+user is checked and they change state from the last time they were checked.
+
+Fixed a bug that kept databases from being created if they didn't exist.
+
+Changed the host checking to check against the host name.  This was checking
+the user name against the times stored for the host in the host database.
+
+0.3.0
+Added autotools support.
+Added man page documentation.
