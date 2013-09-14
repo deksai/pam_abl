@@ -52,7 +52,7 @@ static void log_out(int pri, const char *format, ...) {
     va_end(ap);
 }
 
-#if !defined(TOOLS) && !defined(TEST)
+#if !defined(TOOLS)
 void log_pam_error(pam_handle_t *handle, int err, const char *what) {
     log_out(LOG_ERR, "%s (%d) while %s", pam_strerror(handle, err), err, what);
 }

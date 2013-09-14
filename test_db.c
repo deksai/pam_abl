@@ -31,8 +31,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define TEST_DIR "/tmp/pam-abl_dbtest-dir"
-
 static const char *bdbFile = "./pam_abl_bdb.so";
 static const char *kcFile = "./pam_abl_kc.so";
 static abl_db_open_ptr openFunc = NULL;

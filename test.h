@@ -22,6 +22,8 @@
 
 #include "CUnit/Basic.h"
 
+#define TEST_DIR "/tmp/pam-abl_dbtest-dir"
+
 //some helper functions
 void removeDir(const char *dirname);
 void makeDir(const char *dirname);
@@ -46,5 +48,7 @@ void addExternalCommandTests(const char *cmd);
 void addRunCommandTests();
 //test the config parsing
 void addConfigTests();
+//test the pam integration functions
+void addPamFunctionsTests(const char *module);
 
 #endif

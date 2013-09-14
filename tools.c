@@ -28,7 +28,6 @@
 #include <stdarg.h>
 #include <string.h>
 #include <getopt.h>
-#include <dlfcn.h>
 
 #define PAD "\t"
 #define DEFAULT_CONFIG "/etc/security/pam_abl.conf"
@@ -767,19 +766,9 @@ int main(int argc, char **argv) {
 
     /* Most everything should be set, and it should be safe to open the
      * databases. */
-    void *dblib = NULL;
-    abl_db_open_ptr db_open = NULL;
-
-    dblib = dlopen(args->db_module, RTLD_LAZY);
-    if (!dblib) {
-        log_error("%s opening database module",dlerror());
-        goto main_done;
-    }
-    dlerror();
-    db_open = dlsym(dblib, "abl_db_open");
-    abldb = db_open(args->db_home);
+    abldb = setup_db();
     if (!abldb) {
-        return 1;
+        goto main_done;
     }
 
     if (command == WHITELIST) {

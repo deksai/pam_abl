@@ -65,7 +65,7 @@ void log_warning(const char *format, ...);
 */
 void log_debug(const char *format, ...);
 
-#if !defined(TOOLS) && !defined(TEST)
+#if !defined(TOOLS)
 void log_pam_error(pam_handle_t *handle, int err, const char *what);
 #endif
 

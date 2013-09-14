@@ -34,6 +34,8 @@ set(PAM_ABL_TEST_SRC
 	test_rule.c
 	test_types.c
 	test_config.c
+	test_pam_functions.c
+	pam_functions.c
 )
 
 # Building without Berkeley Db or Kyoto Cabinet
@@ -130,7 +132,7 @@ if(CUnit_FOUND)
 	include_directories(${CUnit_INCLUDE_DIR})
 	add_executable(pam_abl_test ${PAM_ABL_COMMON_SRC} ${PAM_ABL_TEST_SRC})
 	set_target_properties(pam_abl_test PROPERTIES COMPILE_DEFINITIONS "TEST")
-	target_link_libraries(pam_abl_test ${CMAKE_DL_LIBS} ${CUnit_LIBRARY})
+	target_link_libraries(pam_abl_test ${CMAKE_DL_LIBS} ${CUnit_LIBRARY} ${PAM_LIBRARY})
 endif(CUnit_FOUND)
 
 add_library(pam_abl_lib SHARED ${PAM_ABL_COMMON_SRC} ${PAM_ABL_LIB_SRC})

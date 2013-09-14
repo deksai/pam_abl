@@ -26,6 +26,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -69,6 +70,25 @@ abl_info *copyAblInfo(abl_info *info) {
         copy->service = strdup(info->service);
     copy->blockReason = info->blockReason;
     return copy;
+}
+
+abl_db *setup_db() {
+    abl_db *abldb = NULL;
+    void *dblib = NULL;
+    abl_db_open_ptr db_open = NULL;
+
+    dblib = dlopen(args->db_module, RTLD_LAZY | RTLD_GLOBAL);
+    if (!dblib) {
+        log_error("%s opening database module",dlerror());
+        return NULL;
+    }
+    dlerror();
+    db_open = dlsym(dblib, "abl_db_open");
+    abldb = db_open(args->db_home);
+    if (!abldb) {
+        log_error("The database environment could not be opened %p",abldb);
+    }
+    return abldb;
 }
 
 /*
@@ -355,29 +375,6 @@ BlockState check_attempt(const abl_db *db, abl_info *info, ModuleAction subjects
         info->blockReason = USER_BLOCKED;
     return updatedHostState == BLOCKED || updatedUserState == BLOCKED ? BLOCKED : CLEAR;
 }
-
-/*
-static int whitelistMatch(const char *object, const char *whitelist) {
-    if (!object || !whitelist)
-        return 0;
-    size_t subjLen = strlen(object);
-    const char *begin = whitelist;
-    const char *end = NULL;
-    while ((end = strchr(begin, ';')) != NULL) {
-        size_t len = (size_t)(end - begin);
-        if (subjLen == len) {
-            if (memcmp(begin, object, subjLen) == 0)
-                return 1;
-        }
-        begin = end+1;
-    }
-    if (subjLen == strlen(begin)) {
-        if (memcmp(begin, object, subjLen) == 0)
-            return 1;
-    }
-    return 0;
-}
-*/
 
 static int parseNumber(const char *numberStr, size_t length, unsigned max, unsigned *number, size_t *consumedSize) {
     size_t x = 0;

@@ -38,10 +38,17 @@ void destroyAblInfo(abl_info *info);
 abl_info *copyAblInfo(abl_info *info);
 
 /*
-  Call the desired scripts if possible
-  \param bState Determines what script gets called (BLOCKED or CLEAR)
-  \param info The current host/user/service
-  \return zero on success, otherwise non zero
+    Open our db if possible
+    \return a pointer to the db or NULL on failure
+    \note A message will be logged if the db could not be opened
+*/
+abl_db *setup_db();
+
+/*
+    Call the desired scripts if possible
+    \param bState Determines what script gets called (BLOCKED or CLEAR)
+    \param info The current host/user/service
+    \return zero on success, otherwise non zero
 */
 int runHostCommand(BlockState bState, abl_info *info);
 int runUserCommand(BlockState bState, abl_info *info);

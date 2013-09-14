@@ -26,8 +26,6 @@
 #include <string.h>
 #include <dlfcn.h>
 
-#define TEST_DIR "/tmp/pam-abl_test-dir"
-
 static const char *exePath = NULL;
 static const char *dbModule = NULL;
 
