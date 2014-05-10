@@ -152,15 +152,17 @@ USAGE
 -----
 
 Typically pam_abl.so is added to the auth stack as a required
-module just before whatever modules actually peform
+module just before whatever modules actually perform
 authentication. Here's a fragment of the PAM config for a
 production server that is running pam_abl:
 
+-------------------------------------
 auth required   /lib/security/pam_env.so                           
 auth required   /lib/security/pam_abl.so                           
                 config=/etc/security/pam_abl.conf                  
 auth sufficient /lib/security/pam_unix.so likeauth nullok          
 auth required   /lib/security/pam_deny.so                          
+-------------------------------------
 
 Although all of accepted arguments can be supplied here, they will
 usually be placed in a separate config file and included using
