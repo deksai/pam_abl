@@ -322,26 +322,28 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
             goto dopurge_fail;
         }
         purgeAuthState(authstate, purgeTime);
+
+        if (bsz < ksize + 1) {
+            char *nb;
+            int ns = ksize + 80;
+            if (nb = realloc(buf, ns), NULL == nb) {
+                err = 1;
+                log_sys_error(ENOMEM, "white listing items");
+                goto dopurge_fail;
+            }
+            buf = nb;
+            bsz = ns;
+        }
+        memcpy(buf, key, ksize);
+        buf[ksize] = '\0';
+
         if (getNofAttempts(authstate) == 0) {
-            err = abldb->del(abldb, key, type);
+            err = abldb->del(abldb, buf, type);
             if (err) {
                 destroyAuthState(authstate);
                 goto dopurge_fail;
             }
             if (getState(authstate) != CLEAR) {
-                if (bsz < ksize + 1) {
-                    char *nb;
-                    int ns = ksize + 80;
-                    if (nb = realloc(buf, ns), NULL == nb) {
-                        err = 1;
-                        log_sys_error(ENOMEM, "white listing items");
-                        goto dopurge_fail;
-                    }
-                    buf = nb;
-                    bsz = ns;
-                }
-                memcpy(buf, key, ksize);
-                buf[ksize] = '\0';
                 abl_info info;
                 info.blockReason = CLEAR;
                 info.user = NULL;
@@ -356,8 +358,8 @@ static int dopurge(abl_db *abldb, ablObjectType type) {
                 }
             }
         } else {
-            //err = cursor->c_put(cursor, &key, &newData, DB_CURRENT);
-            err = abldb->put(abldb, key, authstate, type);
+            //err = cursor->c_put(cursor, &buf, &newData, DB_CURRENT);
+            err = abldb->put(abldb, buf, authstate, type);
             if (err) {
                 goto dopurge_fail;
             }
@@ -520,24 +522,26 @@ static int whitelist(abl_db *abldb, ablObjectType type, const char **permit, int
                 log_error("Could not parse a attempts in the database.");
                 continue;
             }
-            err = abldb->del(abldb, key, type);
+
+            if (bsz < ksize + 1) {
+                char *nb;
+                int ns = ksize + 80;
+                if (nb = realloc(buf, ns), NULL == nb) {
+                    err = 1;
+                    log_sys_error(ENOMEM, "white listing items");
+                    goto whitelist_fail;
+                }
+                buf = nb;
+                bsz = ns;
+            }
+            memcpy(buf, key, ksize);
+            buf[ksize] = '\0';
+
+            err = abldb->del(abldb, buf, type);
             if (err) {
                 goto whitelist_fail;
             }
             if (getState(authstate) != CLEAR) {
-                if (bsz < ksize + 1) {
-                    char *nb;
-                    int ns = ksize + 80;
-                    if (nb = realloc(buf, ns), NULL == nb) {
-                        err = 1;
-                        log_sys_error(ENOMEM, "white listing items");
-                        goto whitelist_fail;
-                    }
-                    buf = nb;
-                    bsz = ns;
-                }
-                memcpy(buf, key, ksize);
-                buf[ksize] = '\0';
                 abl_info info;
                 info.blockReason = CLEAR;
                 info.user = NULL;
