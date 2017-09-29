@@ -7,6 +7,18 @@ If you are handy with the autotools framework, feel free to write some scripts a
 
 
 Changelog:
+0.9.0
+This version add support for different database modules.  Berkeley DB has been moved into
+a module, and Kyoto Cabinet has been added as an option.  Kyoto Cabinet has significantly
+better performance.
+
+Incompatibilities:
+- Config file has changed to deal with database modules
+
+Fixes:
+- BUG #34 Fix output to make it easier to parse by removing newline between
+user and state.
+
 0.6.0
 Bugfix release for the 0.5.0 release. But because there are some 
 incompatibilities between this version and 0.5.0 we increased the 
