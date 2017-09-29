@@ -231,10 +231,11 @@ static int doshow(abl_db *db, ablObjectType type) {
         }
         memcpy(buf, key, ksize);
         buf[ksize] = '\0';
-        printf(PAD "%s (%u)\n", buf, getNofAttempts(state));
+        printf(PAD "%-10s (%u)", buf, getNofAttempts(state));
         cnt++;
 
         if (verbose) {
+            printf("\n");
             AuthAttempt attempt;
             while (nextAttempt(state, &attempt) == 0) {
                 if (relative) {
