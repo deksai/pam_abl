@@ -1,22 +1,26 @@
+# -*- cmake -*-
+
+include(LibFindMacros)
+libfind_pkg_check_modules(KyotoCabinet kyotocabinet)
 
 if (NOT KyotoCabinet_INCLUDE_DIR)
-  find_path(KyotoCabinet_INCLUDE_DIR kclangc.h)
+  find_path(KyotoCabinet_INCLUDE_DIR
+    NAMES
+      kcdb.h
+    PATHS
+      ${KyotoCabinet_PKGCONF_INCLUDE_DIRS}
+  )
 endif (NOT KyotoCabinet_INCLUDE_DIR)
 
 if (NOT KyotoCabinet_LIBRARY)
-  find_library(KyotoCabinet_LIBRARY NAMES kyotocabinet)
+  find_library(KyotoCabinet_LIBRARY
+    NAMES
+      kyotocabinet
+    PATHS
+      ${KyotoCabinet_PKGCONF_LIBRARY_DIRS}
+  )
 endif (NOT KyotoCabinet_LIBRARY)
+set(KyotoCabinet_PROCESS_INCLUDES KyotoCabinet_INCLUDE_DIR)
+set(KyotoCabinet_PROCESS_LIBS KyotoCabinet_LIBRARY)
+libfind_process(KyotoCabinet)
 
-if(KyotoCabinet_INCLUDE_DIR AND KyotoCabinet_LIBRARY)
-  set(KyotoCabinet_FOUND TRUE)
-endif(KyotoCabinet_INCLUDE_DIR AND KyotoCabinet_LIBRARY)
-
-if(KyotoCabinet_FOUND)
-  if(NOT KyotoCabinet_FIND_QUIETLY)
-	message(STATUS "Found KyotoCabinet: ${KyotoCabinet_LIBRARY}")
-  endif(NOT KyotoCabinet_FIND_QUIETLY)
-else(KyotoCabinet_FOUND)
-  if(KyotoCabinet_FIND_REQUIRED)
-    message(FATAL_ERROR "Could not find kyotocabinet library.")
-  endif(KyotoCabinet_FIND_REQUIRED)
-endif(KyotoCabinet_FOUND)

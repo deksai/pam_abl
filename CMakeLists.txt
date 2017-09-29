@@ -1,7 +1,26 @@
 cmake_minimum_required (VERSION 2.6)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
-
 project(pam_abl)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "pam_abl")
+SET(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
+SET(CPACK_PACKAGE_VERSION_MAJOR "0")
+SET(CPACK_PACKAGE_VERSION_MINOR "9")
+SET(CPACK_PACKAGE_VERSION_PATCH "0")
+SET(CPACK_GENERATOR "TGZ")
+set(CPACK_SOURCE_GENERATOR TGZ)
+set(CPACK_SOURCE_IGNORE_FILES
+    "htdocs/"
+    "\\\\.git/"
+)
+
+INCLUDE(CPack)
+
+
+find_package(BerkeleyDB)
+find_package(KyotoCabinet)
+find_package(Pam REQUIRED)
+
 set(PAM_ABL_COMMON_SRC
 	config.c
 	log.c
@@ -46,7 +65,7 @@ set(PAM_ABL_TEST_SRC
 option (USE_BDB "Create a loadable module that uses Berkeley Db" ON)
 option (USE_KC "Create a loadable module that uses Kyoto Cabinet" ON)
 if(NOT USE_BDB AND NOT USE_KC)
-	message(FATAL_ERROR "At least Berkeley Db or Kyoto Cabinet should be enabled")
+    message(FATAL_ERROR "No database selected.  At least one of either Berkeley Db or Kyoto Cabinet must be enabled")
 endif(NOT USE_BDB AND NOT USE_KC)
 
 if(USE_BDB)
