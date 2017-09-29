@@ -53,16 +53,20 @@ static int parse_time(const char **sp, long *tp) {
     switch (**sp) {
     case 'd':
         t *= 24;
+        break;
     case 'h':
         t *= 60;
+        break;
     case 'm':
         t *= 60;
+        break;
     case 's':
-        (*sp)++;
+        break;
     default:
         ;
     }
 
+    (*sp)++;
     *tp = t;
 
     return 0;
