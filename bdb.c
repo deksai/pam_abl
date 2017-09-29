@@ -204,9 +204,10 @@ open_fail:
 
 void bdb_close(abl_db *abldb) {
     bdb_state *db = abldb->state;
-    if (db && db->m_hhandle && db->m_uhandle)
+    if (db && db->m_hhandle && db->m_uhandle) {
         db->m_hhandle->close(db->m_hhandle,0);
         db->m_uhandle->close(db->m_uhandle,0);
+    }
     destroy_environment(db->m_environment);
     free(db);
     free(abldb);
