@@ -9,18 +9,19 @@ Welcome to pam-abl.
 1) Introduction
 pam_abl is a pam module designed to automatically block hosts which are attempting a brute force attack. Brute force attacks are an unsophisticated way to find authentication credentials. Basically, a computer is setup to try all kinds of user names and password combinations until one works. It may sound fairly far fetched, but it does actually work. Many system accounts have common user names. Passwords are also easily guessable in many situations. 
 
-The latest version is 0.5.0
-This version is a total rewrite of the previous versions. I guess +-400 lines are unchanged (mostly dealing with parsing the config file).
-The total rewrite results in a lot more stability and some extra features (Please see the manpages in the doc directory for more details).
+The latest version is 0.9.0
 
+This version add support for different database modules.  Berkeley DB has been moved into
+a module, and Kyoto Cabinet has been added as an option.  Kyoto Cabinet has significantly
+better performance.
 
 2) Building
-As you may have noticed pam-abl doesn't come with a normal makefile, mostly because I find them to complicated for what they need to do. That's why I decided to go with cmake. CMake is a family of tools designed to build, test and package software. You can download your copy from their website (http://www.cmake.org/). Eventually the idea is to build packages for most common distributions using cmake.
+Please skim through CMakeLists.txt to get an idea of which variables can be set for library paths etc.
 
-So what do you need to do to build this version. 
-a. Pick yourself a build directory. It can be the directory with the sources.
+If you are not familiar with cmake, the basic steps are: 
+a. Create a build directory. It can be within the sources.
       mkdir cmake_build
-b. cd to that dir
+b. cd to that directory
       cd cmake_build
 c. call cmake with as argument the top level project directory. This will generate a makefile.
       cmake ../
@@ -39,6 +40,8 @@ c. A test executable "pam-abl_test". Really handy for testing it with different 
 
 
 3) Supported databases
+The latest version of Kyoto Cabinet (1.2.76)
+
 Currently pam-abl is tested with the following versions of Berkeley db:
  - db-5.3.15
  - db-5.2.42
