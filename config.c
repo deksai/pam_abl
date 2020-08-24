@@ -34,6 +34,8 @@
 /* User purge time in seconds */
 #define USER_PURGE  (HOURSECS * 24)
 
+abl_args *args;
+
 static size_t config_match(const char *pattern, const char *target, size_t len) {
     return len == strlen(pattern) && memcmp(pattern, target, len) == 0;
 }

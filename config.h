@@ -40,12 +40,14 @@ typedef struct {
     const char      *user_clr_cmd;
     unsigned int     upperlimit;
     unsigned int     lowerlimit;
+    unsigned int     ratelimit_response;
     int              debug;
     /* Storage */
     abl_string      *strs;
 } abl_args;
 
-abl_args *args;
+extern abl_args *args;
+
 
 void config_create();
 void config_free();
