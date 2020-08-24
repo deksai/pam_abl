@@ -126,7 +126,7 @@ Chris Tasma <pam-abl@deksai.com>
 
 REPORTING BUGS
 --------------
-Report bugs to <pam-abl@deksai.com> or using the bugtracker on sourceforge.
+Report bugs to <pam-abl@deksai.com>.
 
 SEE ALSO
 --------
