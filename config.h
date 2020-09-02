@@ -45,7 +45,7 @@ typedef struct {
     abl_string      *strs;
 } abl_args;
 
-abl_args *args;
+extern abl_args *args;
 
 void config_create();
 void config_free();

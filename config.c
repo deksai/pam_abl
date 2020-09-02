@@ -446,3 +446,4 @@ int splitCommand(char *command, char* result[]) {
     return nofParts;
 }
 
+abl_args *args;
