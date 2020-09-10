@@ -110,7 +110,7 @@ int  nextAttempt(AuthState *state, AuthAttempt *attempt);
 void destroyAuthState(AuthState *state);
 
 /*
-  Add a authentication attempt to the list of attempts
+  Add an authentication attempt to the list of attempts
   \param state The state to add the attemp to
   \param reason The block reason for the new attempt
   \param time The time of the new attempt. Make sure this time is newer or the same as any of the already added attempts
