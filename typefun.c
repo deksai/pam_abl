@@ -242,7 +242,7 @@ int addAttempt(AuthState *state, BlockReason reason, time_t pTime, const char *u
     size_t neededSize = userOrHostSize + serviceSize + sizeof(time_t) + sizeof(int);
 
     if (neededSize > state->m_size - state->m_usedSize) {
-        //damn, space left is too smalll, reallocate and move all the data
+        //The space left is too smalll, reallocate and move all the data
         //calculate a good new size for the block of memory (let's leave some spare room, for further enlargements)
         size_t newSize = state->m_usedSize + neededSize + SPARE_SPACE;
         void *newMem = realloc(state->m_data, newSize);
