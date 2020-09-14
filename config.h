@@ -48,7 +48,6 @@ typedef struct {
 
 extern abl_args *args;
 
-
 void config_create();
 void config_free();
 
