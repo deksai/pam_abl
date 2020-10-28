@@ -1,3 +1,21 @@
+THIS PROJECT NEEDS A MAINTAINER!  
+
+This is hardly a surpise to anyone, I am sure.  This project has not had much
+(any) activity for years.  I have kept it around because I enjoyed working on
+it, I use it at work and thought I might get back to it again eventually.  I
+have recently tried to do just that, and have found that there are too many
+other more necessary things in life which make it impossible for me to give
+this any time.  That isn't fair to people who want to use and package the
+software.  Short of being sponsored by my employer, I need to officially cut it
+loose.
+
+I still feel that pam_abl could be quite a bit more capable and helpful.  Some
+of the improvements would be quite simple.  For example, writing a new database
+module to centralise the database (redis?) between boxes would have been nice.
+If you would be keen to properly maintain the project, please let me know.
+
+
+
 Welcome to pam-abl.
 
 1) Introduction
